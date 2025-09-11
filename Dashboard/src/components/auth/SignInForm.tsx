@@ -6,6 +6,7 @@ import Button from "@/components/ui/button/Button";
 import { ChevronLeftIcon, EyeCloseIcon, EyeIcon } from "@/icons";
 import Link from "next/link";
 import Image from "next/image";
+
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -29,6 +30,7 @@ export default function SignInForm() {
       router.push("/user-dashboard");
     }
   };
+
   
   return (
     <div className="flex flex-col flex-1 lg:w-1/2 w-full">
@@ -43,11 +45,10 @@ export default function SignInForm() {
       </div>
       <div className="flex flex-col justify-center flex-1 w-full max-w-md mx-auto">
         <div>
-          {/* Custom Logo and Text Section */}
+
           <div className="flex flex-col items-center mb-8">
-            {/* Replace with your custom image */}
             <Image 
-              src="/images/your-custom-logo.png" // Replace with your image path
+              src="/images/Events.png" 
               alt="Event App Logo"
               width={150}
               height={150}
@@ -63,6 +64,7 @@ export default function SignInForm() {
           
           <div>
             <form onSubmit={handleSignIn}>
+
               <div className="space-y-6">
                 <div>
                   <Label>
