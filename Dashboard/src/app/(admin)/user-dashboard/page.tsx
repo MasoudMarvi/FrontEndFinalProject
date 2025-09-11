@@ -4,7 +4,7 @@ import EventsMap from "@/components/maps/EventsMap";
 import RecentEvents from "@/components/events/RecentEvents";
 
 export const metadata: Metadata = {
-  title: "Event Management Dashboard",
+  title: "User Dashboard - Event Management System",
   description: "Discover and manage events happening around you",
 };
 
