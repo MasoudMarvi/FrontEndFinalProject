@@ -21,6 +21,7 @@ export default function NotificationDropdown() {
     toggleDropdown();
     setNotifying(false);
   };
+  
   return (
     <div className="relative">
       <button
@@ -56,7 +57,7 @@ export default function NotificationDropdown() {
       >
         <div className="flex items-center justify-between pb-3 mb-3 border-b border-gray-100 dark:border-gray-700">
           <h5 className="text-lg font-semibold text-gray-800 dark:text-gray-200">
-            Notification
+            Notifications
           </h5>
           <button
             onClick={toggleDropdown}
@@ -79,7 +80,7 @@ export default function NotificationDropdown() {
           </button>
         </div>
         <ul className="flex flex-col h-auto overflow-y-auto custom-scrollbar">
-          {/* Example notification items */}
+          {/* Event invitation */}
           <li>
             <DropdownItem
               onItemClick={closeDropdown}
@@ -99,16 +100,16 @@ export default function NotificationDropdown() {
               <span className="block">
                 <span className="mb-1.5 space-x-1 block text-theme-sm text-gray-500 dark:text-gray-400">
                   <span className="font-medium text-gray-800 dark:text-white/90">
-                    Terry Franci
+                    Sarah Johnson
                   </span>
-                  <span>requests permission to change</span>
+                  <span>invited you to</span>
                   <span className="font-medium text-gray-800 dark:text-white/90">
-                    Project - Nganter App
+                    Summer Music Festival
                   </span>
                 </span>
 
                 <span className="flex items-center gap-2 text-gray-500 text-theme-xs dark:text-gray-400">
-                  <span>Project</span>
+                  <span>Event</span>
                   <span className="w-1 h-1 bg-gray-400 rounded-full"></span>
                   <span>5 min ago</span>
                 </span>
@@ -116,35 +117,28 @@ export default function NotificationDropdown() {
             </DropdownItem>
           </li>
 
+          {/* Event update */}
           <li>
             <DropdownItem
               onItemClick={closeDropdown}
               className="flex gap-3 rounded-lg border-b border-gray-100 p-3 px-4.5 py-3 hover:bg-gray-100 dark:border-gray-800 dark:hover:bg-white/5"
             >
-              <span className="relative block w-full h-10 rounded-full z-1 max-w-10">
-                <Image
-                  width={40}
-                  height={40}
-                  src="/images/user/user-03.jpg"
-                  alt="User"
-                  className="w-full overflow-hidden rounded-full"
-                />
-                <span className="absolute bottom-0 right-0 z-10 h-2.5 w-full max-w-2.5 rounded-full border-[1.5px] border-white bg-success-500 dark:border-gray-900"></span>
+              <span className="relative flex items-center justify-center w-10 h-10 bg-blue-100 rounded-full dark:bg-blue-900/30">
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-blue-500" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
+                </svg>
               </span>
 
               <span className="block">
-                <span className="mb-1.5 block space-x-1  text-theme-sm text-gray-500 dark:text-gray-400">
+                <span className="mb-1.5 block space-x-1 text-theme-sm text-gray-500 dark:text-gray-400">
+                  <span>Date changed for</span>
                   <span className="font-medium text-gray-800 dark:text-white/90">
-                    Alena Franci
-                  </span>
-                  <span> requests permission to change</span>
-                  <span className="font-medium text-gray-800 dark:text-white/90">
-                    Project - Nganter App
+                    Tech Conference 2025
                   </span>
                 </span>
 
                 <span className="flex items-center gap-2 text-gray-500 text-theme-xs dark:text-gray-400">
-                  <span>Project</span>
+                  <span>Update</span>
                   <span className="w-1 h-1 bg-gray-400 rounded-full"></span>
                   <span>8 min ago</span>
                 </span>
@@ -152,6 +146,7 @@ export default function NotificationDropdown() {
             </DropdownItem>
           </li>
 
+          {/* Event comment */}
           <li>
             <DropdownItem
               onItemClick={closeDropdown}
@@ -172,16 +167,16 @@ export default function NotificationDropdown() {
               <span className="block">
                 <span className="mb-1.5 block space-x-1 text-theme-sm text-gray-500 dark:text-gray-400">
                   <span className="font-medium text-gray-800 dark:text-white/90">
-                    Jocelyn Kenter
+                    Michael Chen
                   </span>
-                  <span>requests permission to change</span>
+                  <span>commented on</span>
                   <span className="font-medium text-gray-800 dark:text-white/90">
-                    Project - Nganter App
+                    Community Cleanup Day
                   </span>
                 </span>
 
                 <span className="flex items-center gap-2 text-gray-500 text-theme-xs dark:text-gray-400">
-                  <span>Project</span>
+                  <span>Comment</span>
                   <span className="w-1 h-1 bg-gray-400 rounded-full"></span>
                   <span>15 min ago</span>
                 </span>
@@ -189,36 +184,29 @@ export default function NotificationDropdown() {
             </DropdownItem>
           </li>
 
+          {/* Event reminder */}
           <li>
             <DropdownItem
               onItemClick={closeDropdown}
               className="flex gap-3 rounded-lg border-b border-gray-100 p-3 px-4.5 py-3 hover:bg-gray-100 dark:border-gray-800 dark:hover:bg-white/5"
               href="#"
             >
-              <span className="relative block w-full h-10 rounded-full z-1 max-w-10">
-                <Image
-                  width={40}
-                  height={40}
-                  src="/images/user/user-05.jpg"
-                  alt="User"
-                  className="w-full overflow-hidden rounded-full"
-                />
-                <span className="absolute bottom-0 right-0 z-10 h-2.5 w-full max-w-2.5 rounded-full border-[1.5px] border-white bg-error-500 dark:border-gray-900"></span>
+              <span className="relative flex items-center justify-center w-10 h-10 bg-orange-100 rounded-full dark:bg-orange-900/30">
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-orange-500" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
+                </svg>
               </span>
 
               <span className="block">
                 <span className="mb-1.5 space-x-1 block text-theme-sm text-gray-500 dark:text-gray-400">
                   <span className="font-medium text-gray-800 dark:text-white/90">
-                    Brandon Philips
+                    Reminder:
                   </span>
-                  <span> requests permission to change</span>
-                  <span className="font-medium text-gray-800 dark:text-white/90">
-                    Project - Nganter App
-                  </span>
+                  <span>Art Exhibition tomorrow at 6:00 PM</span>
                 </span>
 
                 <span className="flex items-center gap-2 text-gray-500 text-theme-xs dark:text-gray-400">
-                  <span>Project</span>
+                  <span>Reminder</span>
                   <span className="w-1 h-1 bg-gray-400 rounded-full"></span>
                   <span>1 hr ago</span>
                 </span>
@@ -226,42 +214,36 @@ export default function NotificationDropdown() {
             </DropdownItem>
           </li>
 
+          {/* New nearby event */}
           <li>
             <DropdownItem
               className="flex gap-3 rounded-lg border-b border-gray-100 p-3 px-4.5 py-3 hover:bg-gray-100 dark:border-gray-800 dark:hover:bg-white/5"
               onItemClick={closeDropdown}
             >
-              <span className="relative block w-full h-10 rounded-full z-1 max-w-10">
-                <Image
-                  width={40}
-                  height={40}
-                  src="/images/user/user-02.jpg"
-                  alt="User"
-                  className="w-full overflow-hidden rounded-full"
-                />
-                <span className="absolute bottom-0 right-0 z-10 h-2.5 w-full max-w-2.5 rounded-full border-[1.5px] border-white bg-success-500 dark:border-gray-900"></span>
+              <span className="relative flex items-center justify-center w-10 h-10 bg-green-100 rounded-full dark:bg-green-900/30">
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-green-500" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
+                </svg>
               </span>
 
               <span className="block">
                 <span className="mb-1.5 space-x-1 block text-theme-sm text-gray-500 dark:text-gray-400">
+                  <span>New event near you:</span>
                   <span className="font-medium text-gray-800 dark:text-white/90">
-                    Terry Franci
-                  </span>
-                  <span>requests permission to change</span>
-                  <span className="font-medium text-gray-800 dark:text-white/90">
-                    Project - Nganter App
+                    Farmers Market
                   </span>
                 </span>
 
                 <span className="flex items-center gap-2 text-gray-500 text-theme-xs dark:text-gray-400">
-                  <span>Project</span>
+                  <span>Nearby Event</span>
                   <span className="w-1 h-1 bg-gray-400 rounded-full"></span>
-                  <span>5 min ago</span>
+                  <span>2 hrs ago</span>
                 </span>
               </span>
             </DropdownItem>
           </li>
 
+          {/* Friend attending */}
           <li>
             <DropdownItem
               onItemClick={closeDropdown}
@@ -281,99 +263,84 @@ export default function NotificationDropdown() {
               <span className="block">
                 <span className="mb-1.5 space-x-1 block text-theme-sm text-gray-500 dark:text-gray-400">
                   <span className="font-medium text-gray-800 dark:text-white/90">
-                    Alena Franci
+                    Emily Rodriguez
                   </span>
-                  <span>requests permission to change</span>
+                  <span>is now attending</span>
                   <span className="font-medium text-gray-800 dark:text-white/90">
-                    Project - Nganter App
+                    Charity Gala Dinner
                   </span>
                 </span>
 
                 <span className="flex items-center gap-2 text-gray-500 text-theme-xs dark:text-gray-400">
-                  <span>Project</span>
+                  <span>Attendance</span>
                   <span className="w-1 h-1 bg-gray-400 rounded-full"></span>
-                  <span>8 min ago</span>
+                  <span>3 hrs ago</span>
                 </span>
               </span>
             </DropdownItem>
           </li>
 
+          {/* Event cancellation */}
           <li>
             <DropdownItem
               onItemClick={closeDropdown}
               className="flex gap-3 rounded-lg border-b border-gray-100 p-3 px-4.5 py-3 hover:bg-gray-100 dark:border-gray-800 dark:hover:bg-white/5"
             >
-              <span className="relative block w-full h-10 rounded-full z-1 max-w-10">
-                <Image
-                  width={40}
-                  height={40}
-                  src="/images/user/user-04.jpg"
-                  alt="User"
-                  className="w-full overflow-hidden rounded-full"
-                />
-                <span className="absolute bottom-0 right-0 z-10 h-2.5 w-full max-w-2.5 rounded-full border-[1.5px] border-white bg-success-500 dark:border-gray-900"></span>
+              <span className="relative flex items-center justify-center w-10 h-10 bg-red-100 rounded-full dark:bg-red-900/30">
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-red-500" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                </svg>
               </span>
 
               <span className="block">
                 <span className="mb-1.5 space-x-1 block text-theme-sm text-gray-500 dark:text-gray-400">
-                  <span className="font-medium text-gray-800 dark:text-white/90">
-                    Jocelyn Kenter
+                  <span className="font-medium text-red-500 dark:text-red-400">
+                    Cancelled:
                   </span>
-                  <span>requests permission to change</span>
-                  <span className="font-medium text-gray-800 dark:text-white/90">
-                    Project - Nganter App
-                  </span>
+                  <span>Outdoor Movie Night due to weather</span>
                 </span>
 
                 <span className="flex items-center gap-2 text-gray-500 text-theme-xs dark:text-gray-400">
-                  <span>Project</span>
+                  <span>Cancellation</span>
                   <span className="w-1 h-1 bg-gray-400 rounded-full"></span>
-                  <span>15 min ago</span>
+                  <span>4 hrs ago</span>
                 </span>
               </span>
             </DropdownItem>
           </li>
 
+          {/* Featured event */}
           <li>
             <DropdownItem
               onItemClick={closeDropdown}
               className="flex gap-3 rounded-lg border-b border-gray-100 p-3 px-4.5 py-3 hover:bg-gray-100 dark:border-gray-800 dark:hover:bg-white/5"
               href="#"
             >
-              <span className="relative block w-full h-10 rounded-full z-1 max-w-10">
-                <Image
-                  width={40}
-                  height={40}
-                  src="/images/user/user-05.jpg"
-                  alt="User"
-                  className="overflow-hidden rounded-full"
-                />
-                <span className="absolute bottom-0 right-0 z-10 h-2.5 w-full max-w-2.5 rounded-full border-[1.5px] border-white bg-error-500 dark:border-gray-900"></span>
+              <span className="relative flex items-center justify-center w-10 h-10 bg-purple-100 rounded-full dark:bg-purple-900/30">
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-purple-500" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                </svg>
               </span>
 
               <span className="block">
                 <span className="mb-1.5 space-x-1 block text-theme-sm text-gray-500 dark:text-gray-400">
-                  <span className="font-medium text-gray-800 dark:text-white/90">
-                    Brandon Philips
+                  <span className="font-medium text-purple-600 dark:text-purple-400">
+                    Featured Event:
                   </span>
-                  <span>requests permission to change</span>
-                  <span className="font-medium text-gray-800 dark:text-white/90">
-                    Project - Nganter App
-                  </span>
+                  <span>International Food Festival this weekend</span>
                 </span>
 
                 <span className="flex items-center gap-2 text-gray-500 text-theme-xs dark:text-gray-400">
-                  <span>Project</span>
+                  <span>Featured</span>
                   <span className="w-1 h-1 bg-gray-400 rounded-full"></span>
-                  <span>1 hr ago</span>
+                  <span>1 day ago</span>
                 </span>
               </span>
             </DropdownItem>
           </li>
-          {/* Add more items as needed */}
         </ul>
         <Link
-          href="/"
+          href="/notifications"
           className="block px-4 py-2 mt-3 text-sm font-medium text-center text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
         >
           View All Notifications
