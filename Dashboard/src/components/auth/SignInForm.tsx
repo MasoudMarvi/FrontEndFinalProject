@@ -5,12 +5,32 @@ import Label from "@/components/form/Label";
 import Button from "@/components/ui/button/Button";
 import { ChevronLeftIcon, EyeCloseIcon, EyeIcon } from "@/icons";
 import Link from "next/link";
-import Image from "next/image"; 
+import Image from "next/image";
+
 import React, { useState } from "react";
+import { useRouter } from "next/navigation";
 
 export default function SignInForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [isChecked, setIsChecked] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const router = useRouter();
+  
+  // Function to handle sign in
+  const handleSignIn = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Mock authentication - in a real app, you would validate against your API
+    if (email.includes("admin")) {
+      // Redirect to admin dashboard
+      router.push("/admin-dashboard");
+    } else {
+      // Redirect to user dashboard
+      router.push("/user-dashboard");
+    }
+  };
+
   
   return (
     <div className="flex flex-col flex-1 lg:w-1/2 w-full">
@@ -25,6 +45,7 @@ export default function SignInForm() {
       </div>
       <div className="flex flex-col justify-center flex-1 w-full max-w-md mx-auto">
         <div>
+
           <div className="flex flex-col items-center mb-8">
             <Image 
               src="/images/Events.png" 
@@ -42,14 +63,20 @@ export default function SignInForm() {
           </div>
           
           <div>
-            
-            <form>
+            <form onSubmit={handleSignIn}>
+
               <div className="space-y-6">
                 <div>
                   <Label>
                     Email <span className="text-error-500">*</span>{" "}
                   </Label>
-                  <Input placeholder="info@gmail.com" type="email" />
+                  <Input 
+                    placeholder="info@gmail.com" 
+                    type="email" 
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                  />
                 </div>
                 <div>
                   <Label>
@@ -59,6 +86,9 @@ export default function SignInForm() {
                     <Input
                       type={showPassword ? "text" : "password"}
                       placeholder="Enter your password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      required
                     />
                     <span
                       onClick={() => setShowPassword(!showPassword)}
@@ -87,7 +117,7 @@ export default function SignInForm() {
                   </Link>
                 </div>
                 <div>
-                  <Button className="w-full" size="sm">
+                  <Button className="w-full" size="sm" type="submit">
                     Sign in
                   </Button>
                 </div>
