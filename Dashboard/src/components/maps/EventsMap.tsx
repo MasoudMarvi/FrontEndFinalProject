@@ -65,6 +65,7 @@ const containerStyle = {
 };
 
 // Default center on Tehran
+
 const defaultCenter = {
   lat: 35.7219,
   lng: 51.3347
@@ -136,7 +137,7 @@ const EventsMap = () => {
             streetViewControl: true,
             fullscreenControl: true,
           }}
-        >
+
           {filteredEvents.map(event => (
             <Marker
               key={event.id}
