@@ -16,133 +16,138 @@ import { Modal } from "@/components/ui/modal";
 interface CalendarEvent extends EventInput {
   extendedProps: {
     calendar: string;
+    location?: string;
+    description?: string;
+    category?: string;
+    isFavorite: boolean;
   };
 }
 
 const Calendar: React.FC = () => {
-  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(
-    null
-  );
-  const [eventTitle, setEventTitle] = useState("");
-  const [eventStartDate, setEventStartDate] = useState("");
-  const [eventEndDate, setEventEndDate] = useState("");
-  const [eventLevel, setEventLevel] = useState("");
+  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const calendarRef = useRef<FullCalendar>(null);
   const { isOpen, openModal, closeModal } = useModal();
 
-  const calendarsEvents = {
-    Danger: "danger",
-    Success: "success",
-    Primary: "primary",
-    Warning: "warning",
+  const eventCategories = {
+    Music: "danger",
+    Technology: "success",
+    Food: "primary",
+    Art: "warning",
+    Sports: "info",
+    Education: "secondary",
   };
 
   useEffect(() => {
-    // Initialize with some events
+    // Initialize with favorite events (these would come from an API in a real app)
     setEvents([
       {
         id: "1",
-        title: "Event Conf.",
-        start: new Date().toISOString().split("T")[0],
-        extendedProps: { calendar: "Danger" },
+        title: "Summer Music Festival",
+        start: "2025-07-15",
+        end: "2025-07-15",
+        allDay: true,
+        extendedProps: { 
+          calendar: "Music", 
+          location: "San Francisco",
+          description: "Annual music festival featuring local and international artists",
+          category: "Music",
+          isFavorite: true
+        },
       },
       {
         id: "2",
-        title: "Meeting",
-        start: new Date(Date.now() + 86400000).toISOString().split("T")[0],
-        extendedProps: { calendar: "Success" },
+        title: "Tech Conference 2025",
+        start: "2025-08-10",
+        end: "2025-08-12",
+        allDay: true,
+        extendedProps: { 
+          calendar: "Technology", 
+          location: "San Francisco",
+          description: "The biggest tech conference of the year",
+          category: "Technology",
+          isFavorite: true
+        },
       },
       {
         id: "3",
-        title: "Workshop",
-        start: new Date(Date.now() + 172800000).toISOString().split("T")[0],
-        end: new Date(Date.now() + 259200000).toISOString().split("T")[0],
-        extendedProps: { calendar: "Primary" },
+        title: "Food & Wine Festival",
+        start: "2025-09-05",
+        end: "2025-09-07",
+        allDay: true,
+        extendedProps: { 
+          calendar: "Food", 
+          location: "Oakland",
+          description: "Taste the best local cuisine and wines",
+          category: "Food",
+          isFavorite: true
+        },
+      },
+      {
+        id: "4",
+        title: "Art Exhibition",
+        start: "2025-06-20",
+        end: "2025-06-25",
+        allDay: true,
+        extendedProps: { 
+          calendar: "Art", 
+          location: "San Jose",
+          description: "Featuring works from local artists",
+          category: "Art",
+          isFavorite: true
+        },
+      },
+      {
+        id: "5",
+        title: "Charity Marathon",
+        start: "2025-05-30",
+        end: "2025-05-30",
+        allDay: true,
+        extendedProps: { 
+          calendar: "Sports", 
+          location: "Berkeley",
+          description: "Annual charity run supporting local causes",
+          category: "Sports",
+          isFavorite: true
+        },
       },
     ]);
   }, []);
 
-  const handleDateSelect = (selectInfo: DateSelectArg) => {
-    resetModalFields();
-    setEventStartDate(selectInfo.startStr);
-    setEventEndDate(selectInfo.endStr || selectInfo.startStr);
-    openModal();
-  };
-
   const handleEventClick = (clickInfo: EventClickArg) => {
     const event = clickInfo.event;
-    setSelectedEvent(event as unknown as CalendarEvent);
-    setEventTitle(event.title);
-    setEventStartDate(event.start?.toISOString().split("T")[0] || "");
-    setEventEndDate(event.end?.toISOString().split("T")[0] || "");
-    setEventLevel(event.extendedProps.calendar);
+    setSelectedEvent({
+      id: event.id,
+      title: event.title,
+      start: event.startStr,
+      end: event.endStr,
+      extendedProps: {
+        calendar: event.extendedProps.calendar,
+        location: event.extendedProps.location,
+        description: event.extendedProps.description,
+        category: event.extendedProps.category,
+        isFavorite: event.extendedProps.isFavorite
+      }
+    });
     openModal();
-  };
-
-  const handleAddOrUpdateEvent = () => {
-    if (selectedEvent) {
-      // Update existing event
-      setEvents((prevEvents) =>
-        prevEvents.map((event) =>
-          event.id === selectedEvent.id
-            ? {
-                ...event,
-                title: eventTitle,
-                start: eventStartDate,
-                end: eventEndDate,
-                extendedProps: { calendar: eventLevel },
-              }
-            : event
-        )
-      );
-    } else {
-      // Add new event
-      const newEvent: CalendarEvent = {
-        id: Date.now().toString(),
-        title: eventTitle,
-        start: eventStartDate,
-        end: eventEndDate,
-        allDay: true,
-        extendedProps: { calendar: eventLevel },
-      };
-      setEvents((prevEvents) => [...prevEvents, newEvent]);
-    }
-    closeModal();
-    resetModalFields();
-  };
-
-  const resetModalFields = () => {
-    setEventTitle("");
-    setEventStartDate("");
-    setEventEndDate("");
-    setEventLevel("");
-    setSelectedEvent(null);
   };
 
   return (
-    <div className="rounded-2xl border  border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
+    <div className="rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
       <div className="custom-calendar">
         <FullCalendar
           ref={calendarRef}
           plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
           initialView="dayGridMonth"
           headerToolbar={{
-            left: "prev,next addEventButton",
+            left: "prev,next",
             center: "title",
             right: "dayGridMonth,timeGridWeek,timeGridDay",
           }}
           events={events}
-          selectable={true}
-          select={handleDateSelect}
           eventClick={handleEventClick}
           eventContent={renderEventContent}
-          customButtons={{
-            addEventButton: {
-              text: "Add Event +",
-              click: openModal,
-            },
-          }}
+          height="auto"
         />
       </div>
       <Modal
@@ -151,116 +156,63 @@ const Calendar: React.FC = () => {
         className="max-w-[700px] p-6 lg:p-10"
       >
         <div className="flex flex-col px-2 overflow-y-auto custom-scrollbar">
-          <div>
-            <h5 className="mb-2 font-semibold text-gray-800 modal-title text-theme-xl dark:text-white/90 lg:text-2xl">
-              {selectedEvent ? "Edit Event" : "Add Event"}
-            </h5>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              Plan your next big moment: schedule or edit an event to stay on
-              track
-            </p>
-          </div>
-          <div className="mt-8">
-            <div>
+          {selectedEvent && (
+            <>
               <div>
-                <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
-                  Event Title
-                </label>
-                <input
-                  id="event-title"
-                  type="text"
-                  value={eventTitle}
-                  onChange={(e) => setEventTitle(e.target.value)}
-                  className="dark:bg-dark-900 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800"
-                />
+                <h5 className="mb-2 font-semibold text-gray-800 modal-title text-theme-xl dark:text-white/90 lg:text-2xl">
+                  {selectedEvent.title}
+                </h5>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  {selectedEvent.extendedProps.description}
+                </p>
               </div>
-            </div>
-            <div className="mt-6">
-              <label className="block mb-4 text-sm font-medium text-gray-700 dark:text-gray-400">
-                Event Color
-              </label>
-              <div className="flex flex-wrap items-center gap-4 sm:gap-5">
-                {Object.entries(calendarsEvents).map(([key, value]) => (
-                  <div key={key} className="n-chk">
-                    <div
-                      className={`form-check form-check-${value} form-check-inline`}
-                    >
-                      <label
-                        className="flex items-center text-sm text-gray-700 form-check-label dark:text-gray-400"
-                        htmlFor={`modal${key}`}
-                      >
-                        <span className="relative">
-                          <input
-                            className="sr-only form-check-input"
-                            type="radio"
-                            name="event-level"
-                            value={key}
-                            id={`modal${key}`}
-                            checked={eventLevel === key}
-                            onChange={() => setEventLevel(key)}
-                          />
-                          <span className="flex items-center justify-center w-5 h-5 mr-2 border border-gray-300 rounded-full box dark:border-gray-700">
-                            <span
-                              className={`h-2 w-2 rounded-full bg-white ${
-                                eventLevel === key ? "block" : "hidden"
-                              }`}  
-                            ></span>
-                          </span>
-                        </span>
-                        {key}
-                      </label>
-                    </div>
-                  </div>
-                ))}
+              <div className="mt-8 space-y-4">
+                <div className="flex items-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 mr-2 text-gray-600 dark:text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  <span className="text-sm text-gray-700 dark:text-gray-300">
+                    {new Date(selectedEvent.start as string).toLocaleDateString()} 
+                    {selectedEvent.end && selectedEvent.start !== selectedEvent.end && 
+                      ` - ${new Date(selectedEvent.end as string).toLocaleDateString()}`
+                    }
+                  </span>
+                </div>
+                <div className="flex items-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 mr-2 text-gray-600 dark:text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                  <span className="text-sm text-gray-700 dark:text-gray-300">
+                    {selectedEvent.extendedProps.location}
+                  </span>
+                </div>
+                <div className="flex items-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 mr-2 text-gray-600 dark:text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                  </svg>
+                  <span className="text-sm text-gray-700 dark:text-gray-300">
+                    {selectedEvent.extendedProps.category}
+                  </span>
+                </div>
               </div>
-            </div>
-
-            <div className="mt-6">
-              <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
-                Enter Start Date
-              </label>
-              <div className="relative">
-                <input
-                  id="event-start-date"
-                  type="date"
-                  value={eventStartDate}
-                  onChange={(e) => setEventStartDate(e.target.value)}
-                  className="dark:bg-dark-900 h-11 w-full appearance-none rounded-lg border border-gray-300 bg-transparent bg-none px-4 py-2.5 pl-4 pr-11 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800"
-                />
+              <div className="flex items-center justify-end mt-6 gap-3">
+                <button
+                  onClick={closeModal}
+                  type="button"
+                  className="flex w-auto justify-center rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-white/[0.03]"
+                >
+                  Close
+                </button>
+                <a
+                  href={`/basic-tables`} // Link to My Events page
+                  className="flex w-auto justify-center rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-600"
+                >
+                  View All Events
+                </a>
               </div>
-            </div>
-
-            <div className="mt-6">
-              <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
-                Enter End Date
-              </label>
-              <div className="relative">
-                <input
-                  id="event-end-date"
-                  type="date"
-                  value={eventEndDate}
-                  onChange={(e) => setEventEndDate(e.target.value)}
-                  className="dark:bg-dark-900 h-11 w-full appearance-none rounded-lg border border-gray-300 bg-transparent bg-none px-4 py-2.5 pl-4 pr-11 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800"
-                />
-              </div>
-            </div>
-          </div>
-          <div className="flex items-center gap-3 mt-6 modal-footer sm:justify-end">
-            <button
-              onClick={closeModal}
-              type="button"
-              className="flex w-full justify-center rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-white/[0.03] sm:w-auto"
-            >
-              Close
-            </button>
-            <button
-              onClick={handleAddOrUpdateEvent}
-              type="button"
-              className="btn btn-success btn-update-event flex w-full justify-center rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-600 sm:w-auto"
-            >
-              {selectedEvent ? "Update Changes" : "Add Event"}
-            </button>
-          </div>
+            </>
+          )}
         </div>
       </Modal>
     </div>
@@ -268,13 +220,24 @@ const Calendar: React.FC = () => {
 };
 
 const renderEventContent = (eventInfo: EventContentArg) => {
-  const colorClass = `fc-bg-${eventInfo.event.extendedProps.calendar.toLowerCase()}`;
+  // Map category names to color classes
+  const categoryColorMap: {[key: string]: string} = {
+    'Music': 'danger',
+    'Technology': 'success',
+    'Food': 'primary',
+    'Art': 'warning',
+    'Sports': 'info',
+    'Education': 'secondary'
+  };
+  
+  const category = eventInfo.event.extendedProps.calendar;
+  const colorClass = `fc-bg-${categoryColorMap[category]?.toLowerCase() || 'primary'}`;
+  
   return (
     <div
       className={`event-fc-color flex fc-event-main ${colorClass} p-1 rounded-sm`}
     >
       <div className="fc-daygrid-event-dot"></div>
-      <div className="fc-event-time">{eventInfo.timeText}</div>
       <div className="fc-event-title">{eventInfo.event.title}</div>
     </div>
   );

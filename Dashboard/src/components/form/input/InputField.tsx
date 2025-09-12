@@ -1,4 +1,6 @@
+"use client";
 import React, { FC } from "react";
+
 
 interface InputProps {
   type?: "text" | "number" | "email" | "password" | "date" | "time" | string;

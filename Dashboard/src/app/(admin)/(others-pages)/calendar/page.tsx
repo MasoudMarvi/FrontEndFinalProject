@@ -4,15 +4,19 @@ import { Metadata } from "next";
 import React from "react";
 
 export const metadata: Metadata = {
-  title: "Next.js Calender | TailAdmin - Next.js Dashboard Template",
-  description:
-    "This is Next.js Calender page for TailAdmin  Tailwind CSS Admin Dashboard Template",
-  // other metadata
+  title: "My Event Calendar - Event Management System",
+  description: "View your favorite events on a calendar",
 };
-export default function page() {
+
+export default function CalendarPage() {
   return (
     <div>
-      <PageBreadcrumb pageTitle="Calendar" />
+      <PageBreadcrumb pageTitle="Event Calendar" />
+      <div className="mb-6">
+        <p className="text-gray-500 dark:text-gray-400">
+          View all your favorite events on the calendar. Click on an event to see more details.
+        </p>
+      </div>
       <Calendar />
     </div>
   );
