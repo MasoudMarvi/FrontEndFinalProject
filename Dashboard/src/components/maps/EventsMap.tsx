@@ -48,10 +48,10 @@ const containerStyle = {
   height: '500px'
 };
 
-// Default center on San Francisco
+// Default center on Tehran (as per your coordinates)
 const defaultCenter = {
-  lat: 37.7749,
-  lng: -122.4194
+  lat: 35.7219,
+  lng: 51.3347
 };
 
 const EventsMap = () => {
@@ -74,14 +74,7 @@ const EventsMap = () => {
         <GoogleMap
           mapContainerStyle={containerStyle}
           center={defaultCenter}
-          zoom={10}
-          options={{
-            styles: [
-              { elementType: "geometry", stylers: [{ color: "#242f3e" }] },
-              { elementType: "labels.text.stroke", stylers: [{ color: "#242f3e" }] },
-              { elementType: "labels.text.fill", stylers: [{ color: "#746855" }] },
-            ],
-          }}
+          zoom={12} // Increased zoom level for better road visibility
         >
           {sampleEvents.map(event => (
             <Marker
