@@ -9,37 +9,50 @@ import Image from "next/image";
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
+import { login } from "@/lib/api"; // ✅ import your login function
 
 export default function SignInForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [isChecked, setIsChecked] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
   const router = useRouter();
-  
+
   // Function to handle sign in
-  const handleSignIn = (e: React.FormEvent) => {
+  const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Mock authentication - in a real app, you would validate against your API
-    if (email.includes("admin")) {
-      // Redirect to admin dashboard
-      router.push("/admin-dashboard");
-    } else {
-      // Redirect to user dashboard
-      router.push("/user-dashboard");
+    setLoading(true);
+    setErrorMsg("");
+
+    try {
+      const user = await login({ email, password });
+
+      // 🔑 You already store tokens in localStorage inside login()
+      // Now decide where to go based on roles
+      if (user.roles.includes("Admin")) {
+        router.push("/admin-dashboard");
+      } else {
+        router.push("/user-dashboard");
+      }
+    } catch (error: any) {
+      setErrorMsg(error.message);
+    } finally {
+      setLoading(false);
     }
   };
 
-  
+
+
   return (
     <div className="flex flex-col flex-1 lg:w-1/2 w-full">
       <div className="flex flex-col justify-center flex-1 w-full max-w-md mx-auto">
         <div>
 
           <div className="flex flex-col items-center mb-8">
-            <Image 
-              src="/images/Events.png" 
+            <Image
+              src="/images/Events.png"
               alt="Event App Logo"
               width={150}
               height={150}
@@ -52,18 +65,18 @@ export default function SignInForm() {
               Your comprehensive solution for event planning and management
             </p>
           </div>
-          
+
           <div>
             <form onSubmit={handleSignIn}>
-
+              {errorMsg && <p className="text-red-500 text-center">{errorMsg}</p>}
               <div className="space-y-6">
                 <div>
                   <Label>
                     Email <span className="text-error-500">*</span>{" "}
                   </Label>
-                  <Input 
-                    placeholder="info@gmail.com" 
-                    type="email" 
+                  <Input
+                    placeholder="info@gmail.com"
+                    type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
@@ -108,7 +121,7 @@ export default function SignInForm() {
                   </Link>
                 </div>
                 <div>
-                  <Button className="w-full" size="sm" type="submit">
+                  <Button className="w-full" size="sm" >
                     Sign in
                   </Button>
                 </div>
