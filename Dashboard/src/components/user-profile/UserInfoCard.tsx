@@ -1,5 +1,5 @@
 "use client";
-import React from "react";
+import React, { useState } from "react";
 import { useModal } from "../../hooks/useModal";
 import { Modal } from "../ui/modal";
 import Button from "../ui/button/Button";
@@ -8,11 +8,87 @@ import Label from "../form/Label";
 
 export default function UserInfoCard() {
   const { isOpen, openModal, closeModal } = useModal();
+  const [showPasswordSection, setShowPasswordSection] = useState(false);
+  const [isResetPasswordModalOpen, setIsResetPasswordModalOpen] = useState(false);
+  
+  // Password reset states
+  const [resetStep, setResetStep] = useState(1); // 1: Enter current password, 2: Enter new password
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState(false);
+
   const handleSave = () => {
     // Handle save logic here
     console.log("Saving changes...");
     closeModal();
   };
+
+  const togglePasswordSection = () => {
+    setShowPasswordSection(!showPasswordSection);
+  };
+
+  const openResetPasswordModal = () => {
+    setIsResetPasswordModalOpen(true);
+    closeModal(); // Close the edit profile modal
+  };
+
+  const closeResetPasswordModal = () => {
+    setIsResetPasswordModalOpen(false);
+    setResetStep(1);
+    setCurrentPassword("");
+    setNewPassword("");
+    setConfirmPassword("");
+    setError("");
+    setSuccess(false);
+  };
+
+  const handleCurrentPasswordSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // In a real application, you would verify the current password against the backend
+    // For demo purposes, we'll just proceed to the next step
+    if (currentPassword.trim() === "") {
+      setError("Please enter your current password");
+      return;
+    }
+    
+    setError("");
+    setResetStep(2);
+  };
+
+  const handlePasswordReset = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Validate passwords
+    if (newPassword.trim() === "" || confirmPassword.trim() === "") {
+      setError("Please fill in all fields");
+      return;
+    }
+    
+    if (newPassword !== confirmPassword) {
+      setError("Passwords do not match");
+      return;
+    }
+    
+    if (newPassword.length < 8) {
+      setError("Password must be at least 8 characters long");
+      return;
+    }
+    
+    // In a real application, you would submit the new password to the backend
+    console.log("Password reset submitted");
+    
+    setError("");
+    setSuccess(true);
+    
+    // Close modal after 3 seconds
+    setTimeout(() => {
+      closeResetPasswordModal();
+    }, 3000);
+  };
+
   return (
     <div className="p-5 border border-gray-200 rounded-2xl dark:border-gray-800 lg:p-6">
       <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
@@ -66,6 +142,16 @@ export default function UserInfoCard() {
                 Team Manager
               </p>
             </div>
+            
+            {/* New Security Section */}
+            <div>
+              <p className="mb-2 text-xs leading-normal text-gray-500 dark:text-gray-400">
+                Security
+              </p>
+              <p className="text-sm font-medium text-gray-800 dark:text-white/90">
+                ••••••••••••
+              </p>
+            </div>
           </div>
         </div>
 
@@ -92,6 +178,7 @@ export default function UserInfoCard() {
         </button>
       </div>
 
+      {/* Edit Personal Info Modal */}
       <Modal isOpen={isOpen} onClose={closeModal} className="max-w-[700px] m-4">
         <div className="no-scrollbar relative w-full max-w-[700px] overflow-y-auto rounded-3xl bg-white p-4 dark:bg-gray-900 lg:p-11">
           <div className="px-2 pr-14">
@@ -159,6 +246,44 @@ export default function UserInfoCard() {
                   </div>
                 </div>
               </div>
+              
+              {/* New Security Section */}
+              <div className="mt-7">
+                <div className="flex items-center justify-between mb-5">
+                  <h5 className="text-lg font-medium text-gray-800 dark:text-white/90">
+                    Security
+                  </h5>
+                  <Button 
+                    size="sm" 
+                    variant="outline" 
+                    onClick={openResetPasswordModal}
+                    className="flex items-center gap-2"
+                  >
+                    <svg 
+                      xmlns="http://www.w3.org/2000/svg" 
+                      className="w-4 h-4" 
+                      fill="none" 
+                      viewBox="0 0 24 24" 
+                      stroke="currentColor"
+                    >
+                      <path 
+                        strokeLinecap="round" 
+                        strokeLinejoin="round" 
+                        strokeWidth={2} 
+                        d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" 
+                      />
+                    </svg>
+                    Reset Password
+                  </Button>
+                </div>
+                
+                <div className="p-4 rounded-lg bg-gray-50 dark:bg-gray-800">
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    For security reasons, password changes are handled separately. 
+                    Click the "Reset Password" button to update your password.
+                  </p>
+                </div>
+              </div>
             </div>
             <div className="flex items-center gap-3 px-2 mt-6 lg:justify-end">
               <Button size="sm" variant="outline" onClick={closeModal}>
@@ -169,6 +294,121 @@ export default function UserInfoCard() {
               </Button>
             </div>
           </form>
+        </div>
+      </Modal>
+      
+      {/* Reset Password Modal */}
+      <Modal isOpen={isResetPasswordModalOpen} onClose={closeResetPasswordModal} className="max-w-[500px] m-4">
+        <div className="no-scrollbar relative w-full max-w-[500px] overflow-y-auto rounded-3xl bg-white p-6 dark:bg-gray-900">
+          <div className="mb-6">
+            <h4 className="mb-2 text-xl font-semibold text-gray-800 dark:text-white/90">
+              Reset Password
+            </h4>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              {resetStep === 1 
+                ? "Enter your current password to proceed." 
+                : "Create a new password for your account."}
+            </p>
+          </div>
+          
+          {success ? (
+            <div className="p-4 mb-6 text-sm text-green-700 bg-green-100 rounded-lg dark:bg-green-200 dark:text-green-800">
+              <p className="text-center">
+                Your password has been updated successfully!
+              </p>
+            </div>
+          ) : (
+            <>
+              {error && (
+                <div className="p-4 mb-4 text-sm text-red-700 bg-red-100 rounded-lg dark:bg-red-200 dark:text-red-800">
+                  <p>{error}</p>
+                </div>
+              )}
+              
+              {resetStep === 1 ? (
+                <form onSubmit={handleCurrentPasswordSubmit}>
+                  <div className="mb-6">
+                    <Label>
+                      Current Password <span className="text-error-500">*</span>
+                    </Label>
+                    <Input 
+                      type="password" 
+                      placeholder="Enter your current password"
+                      value={currentPassword}
+                      onChange={(e) => setCurrentPassword(e.target.value)}
+                      required
+                    />
+                  </div>
+                  
+                  <div className="flex justify-end gap-3">
+                    <Button 
+                      size="sm" 
+                      variant="outline" 
+                      onClick={closeResetPasswordModal}
+                    >
+                      Cancel
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      type="submit"
+                    >
+                      Continue
+                    </Button>
+                  </div>
+                </form>
+              ) : (
+                <form onSubmit={handlePasswordReset}>
+                  <div className="space-y-6 mb-6">
+                    <div>
+                      <Label>
+                        New Password <span className="text-error-500">*</span>
+                      </Label>
+                      <Input 
+                        type="password" 
+                        placeholder="Enter new password"
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        required
+                        minLength={8}
+                      />
+                      <p className="mt-1 text-xs text-gray-500">
+                        Password must be at least 8 characters long
+                      </p>
+                    </div>
+                    
+                    <div>
+                      <Label>
+                        Confirm Password <span className="text-error-500">*</span>
+                      </Label>
+                      <Input 
+                        type="password" 
+                        placeholder="Confirm new password"
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        required
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="flex justify-end gap-3">
+                    <Button 
+                      size="sm" 
+                      variant="outline" 
+                      onClick={() => setResetStep(1)}
+                    >
+                      Back
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      type="submit"
+                    >
+                      Update Password
+                    </Button>
+                  </div>
+                </form>
+              )}
+            </>
+          )}
         </div>
       </Modal>
     </div>

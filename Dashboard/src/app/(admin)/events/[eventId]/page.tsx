@@ -4,8 +4,9 @@ import { useParams } from 'next/navigation';
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import PageBreadCrumb from '@/components/common/PageBreadCrumb';
-import { GoogleMap, LoadScript, Marker } from '@react-google-maps/api';
+import { GoogleMap, Marker } from '@react-google-maps/api'; // Removed LoadScript
 import Image from 'next/image';
+import { useGoogleMaps } from '@/context/GoogleMapsContext'; // Added this import
 
 // Enhanced sample event data with multiple images
 const sampleEvents = [
@@ -83,6 +84,7 @@ const containerStyle = {
 };
 
 export default function EventDetailsPage() {
+  const { isLoaded } = useGoogleMaps(); // Using the Google Maps context
   const params = useParams();
   const eventId = params.eventId as string;
   const [event, setEvent] = useState<any>(null);
@@ -421,18 +423,24 @@ export default function EventDetailsPage() {
             </div>
           </div>
           
-          {/* Location Map */}
+          {/* Location Map - Updated to use GoogleMapsContext */}
           <div>
             <h2 className="text-lg font-semibold text-gray-800 dark:text-white/90 mb-4">Location</h2>
-            <LoadScript googleMapsApiKey="AIzaSyBhLrwCAC_nm31ET5JPCv7vw0I5nPDGeZQ">
-              <GoogleMap
-                mapContainerStyle={containerStyle}
-                center={{ lat: event.location.lat, lng: event.location.lng }}
-                zoom={14}
-              >
-                <Marker position={{ lat: event.location.lat, lng: event.location.lng }} />
-              </GoogleMap>
-            </LoadScript>
+            <div className="w-full h-[300px] rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700">
+              {isLoaded ? (
+                <GoogleMap
+                  mapContainerStyle={containerStyle}
+                  center={{ lat: event.location.lat, lng: event.location.lng }}
+                  zoom={14}
+                >
+                  <Marker position={{ lat: event.location.lat, lng: event.location.lng }} />
+                </GoogleMap>
+              ) : (
+                <div className="w-full h-full flex items-center justify-center bg-gray-100 dark:bg-gray-800">
+                  <div className="text-gray-500 dark:text-gray-400">Loading map...</div>
+                </div>
+              )}
+            </div>
             <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
               Coordinates: {event.location.lat}, {event.location.lng}
             </p>

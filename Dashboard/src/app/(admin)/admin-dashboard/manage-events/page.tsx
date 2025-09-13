@@ -4,7 +4,8 @@ import PageBreadCrumb from '@/components/common/PageBreadCrumb';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { GoogleMap, Marker, useJsApiLoader } from '@react-google-maps/api';
+import { GoogleMap, Marker } from '@react-google-maps/api';
+import { useGoogleMaps } from '@/context/GoogleMapsContext';
 
 // Define the environmental data type
 interface EnvironmentalData {
@@ -152,11 +153,7 @@ const MapComponent = ({
   location: { lat: number; lng: number }, 
   onLocationChange: (lat: number, lng: number) => void 
 }) => {
-  const { isLoaded } = useJsApiLoader({
-    id: 'google-map-script',
-    googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ''
-  });
-
+  const { isLoaded } = useGoogleMaps();
   const [map, setMap] = useState<google.maps.Map | null>(null);
 
   const onLoad = React.useCallback((map: google.maps.Map) => {

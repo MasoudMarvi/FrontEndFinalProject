@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react";
 import Image from "next/image";
 import Input from "@/components/form/input/InputField";
 import Label from "@/components/form/Label";
@@ -7,10 +7,42 @@ import TextArea from "@/components/form/input/TextArea";
 import Checkbox from "@/components/form/input/Checkbox";
 import Select from "@/components/form/Select";
 import PageBreadCrumb from "@/components/common/PageBreadCrumb";
+import { GoogleMap, Marker } from '@react-google-maps/api';
+import { useGoogleMaps } from "@/context/GoogleMapsContext";
 
 export default function CreateEventForm() {
+  const { isLoaded } = useGoogleMaps();
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
+  const [location, setLocation] = useState<{lat: number, lng: number} | null>(null);
+  
+  // Map center (default location - can be set to your preferred default)
+  const mapCenter = { lat: 35.7219, lng: 51.3347 }; // Tehran center
+  
+  // Map options
+  const mapOptions = {
+    disableDefaultUI: false,
+    clickableIcons: true,
+    scrollwheel: true,
+  };
+  
+  // Handle map click to set marker and update coordinates
+  const handleMapClick = useCallback((e: google.maps.MapMouseEvent) => {
+    if (e.latLng) {
+      const lat = e.latLng.lat();
+      const lng = e.latLng.lng();
+      setLocation({ lat, lng });
+      
+      // Update the form fields
+      const latitudeInput = document.getElementById('latitude') as HTMLInputElement;
+      const longitudeInput = document.getElementById('longitude') as HTMLInputElement;
+      
+      if (latitudeInput && longitudeInput) {
+        latitudeInput.value = lat.toString();
+        longitudeInput.value = lng.toString();
+      }
+    }
+  }, []);
 
   // Handle image upload
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -46,7 +78,7 @@ export default function CreateEventForm() {
         </div>
         
         <form className="space-y-6">
-          {/* Event Title */}
+          {/* First part of the form remains unchanged */}
           <div>
             <Label htmlFor="eventTitle">
               Event Title <span className="text-error-500">*</span>
@@ -170,6 +202,38 @@ export default function CreateEventForm() {
             </div>
           </div>
           
+          {/* Google Map for selecting location */}
+          <div>
+            <Label htmlFor="eventLocation">
+              Event Location <span className="text-error-500">*</span>
+            </Label>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">
+              Click on the map to set the event location
+            </p>
+            
+            <div className="w-full h-[300px] rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700">
+              {isLoaded ? (
+                <GoogleMap
+                  mapContainerStyle={{ width: '100%', height: '100%' }}
+                  center={location || mapCenter}
+                  zoom={13}
+                  options={mapOptions}
+                  onClick={handleMapClick}
+                >
+                  {location && (
+                    <Marker
+                      position={location}
+                    />
+                  )}
+                </GoogleMap>
+              ) : (
+                <div className="w-full h-full flex items-center justify-center bg-gray-100 dark:bg-gray-800">
+                  <div className="text-gray-500 dark:text-gray-400">Loading map...</div>
+                </div>
+              )}
+            </div>
+          </div>
+          
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
             {/* Latitude */}
             <div>
@@ -180,6 +244,7 @@ export default function CreateEventForm() {
                 id="latitude"
                 type="text" 
                 placeholder="e.g. 37.7749"
+                defaultValue={location?.lat?.toString() || ""}
                 required
               />
             </div>
@@ -193,6 +258,7 @@ export default function CreateEventForm() {
                 id="longitude"
                 type="text" 
                 placeholder="e.g. -122.4194"
+                defaultValue={location?.lng?.toString() || ""}
                 required
               />
             </div>

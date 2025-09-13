@@ -1,7 +1,8 @@
 "use client";
 import React, { useState } from 'react';
-import { GoogleMap, LoadScript, Marker, InfoWindow } from '@react-google-maps/api';
+import { GoogleMap, Marker, InfoWindow } from '@react-google-maps/api';
 import Link from 'next/link';
+import { useGoogleMaps } from '@/context/GoogleMapsContext';
 
 // Define the type for event data
 interface EventData {
@@ -88,6 +89,7 @@ function getCategoryPinColor(category: string): string {
 }
 
 const EventsMap = () => {
+  const { isLoaded } = useGoogleMaps();
   const [selectedEvent, setSelectedEvent] = useState<EventData | null>(null);
   const [selectedCategory, setSelectedCategory] = useState('All Categories');
 
@@ -127,7 +129,7 @@ const EventsMap = () => {
         </div>
       </div>
       
-      <LoadScript googleMapsApiKey="AIzaSyBhLrwCAC_nm31ET5JPCv7vw0I5nPDGeZQ">
+      {isLoaded ? (
         <GoogleMap
           mapContainerStyle={containerStyle}
           center={defaultCenter}
@@ -191,7 +193,11 @@ const EventsMap = () => {
             </InfoWindow>
           )}
         </GoogleMap>
-      </LoadScript>
+      ) : (
+        <div className="w-full h-[500px] flex items-center justify-center bg-gray-100 dark:bg-gray-800">
+          <div className="text-gray-500 dark:text-gray-400">Loading map...</div>
+        </div>
+      )}
 
       {/* Legend */}
       <div className="flex flex-wrap items-center gap-3 mt-4 px-2">
