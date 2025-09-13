@@ -1,5 +1,5 @@
 import api from '../axios';
-import { CreateUserCommand, UpdateUserCommand, AuthResponse } from './types';
+import { CreateUserCommand, UpdateUserCommand, AuthResponse, RegisterResponse } from './types';
 
 export interface UserResponse {
   // Define this based on what your API returns
@@ -49,7 +49,7 @@ export async function register(data: {
   fullName: string;
   email: string;
   password: string;
-}): Promise<AuthResponse> {
+}): Promise<RegisterResponse> {
   try {
     const userData: CreateUserCommand = {
       email: data.email,
@@ -58,6 +58,7 @@ export async function register(data: {
       role: 'User' // Default role, adjust as needed
     };
     const res = await createUser(userData);
+    console.log("responseRegister: " , res);
     return res;
   } catch (err: any) {
     throw new Error(err.response?.data?.message || 'Registration failed');

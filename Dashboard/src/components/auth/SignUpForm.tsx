@@ -6,10 +6,37 @@ import { EyeCloseIcon, EyeIcon } from "@/icons";
 import Link from "next/link";
 import Image from "next/image"; 
 import React, { useState } from "react";
+import { register } from "@/lib/api/users"; 
+import { useRouter } from "next/navigation";
+
 export default function SignUpForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [isChecked, setIsChecked] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [fullName, setFullname] = useState("");
+  const [errorMsg, setErrorMsg] = useState("");
+  const router = useRouter();
   
+const handleSignUp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMsg("");
+
+    try {
+      const user = await register({ fullName, email, password });
+
+      // 🔑 You already store tokens in localStorage inside login()
+      // Now decide where to go based on roles
+      if (user) {
+        router.push("/signin");
+      } else {
+        setErrorMsg("User can not be created");
+      }
+    } catch (error: any) {
+      setErrorMsg(error.message);
+    } finally {
+    }
+  };
   return (
     <div className="flex flex-col flex-1 lg:w-1/2 w-full overflow-y-auto no-scrollbar">
       <div className="flex flex-col justify-center flex-1 w-full max-w-md mx-auto">
@@ -33,32 +60,22 @@ export default function SignUpForm() {
           
           <div>
           
-            
-            <form>
+            <form onSubmit={handleSignUp}>
+              {errorMsg && <p className="text-red-500 text-center">{errorMsg}</p>}
               <div className="space-y-5">
                 <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
                   {/* <!-- First Name --> */}
                   <div className="sm:col-span-1">
                     <Label>
-                      First Name<span className="text-error-500">*</span>
+                      Full Name<span className="text-error-500">*</span>
                     </Label>
                     <Input
                       type="text"
                       id="fname"
                       name="fname"
+                      value={fullName}
+                      onChange={(e) => setFullname(e.target.value)}
                       placeholder="Enter your first name"
-                    />
-                  </div>
-                  {/* <!-- Last Name --> */}
-                  <div className="sm:col-span-1">
-                    <Label>
-                      Last Name<span className="text-error-500">*</span>
-                    </Label>
-                    <Input
-                      type="text"
-                      id="lname"
-                      name="lname"
-                      placeholder="Enter your last name"
                     />
                   </div>
                 </div>
@@ -71,6 +88,8 @@ export default function SignUpForm() {
                     type="email"
                     id="email"
                     name="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
                     placeholder="Enter your email"
                   />
                 </div>
@@ -81,6 +100,8 @@ export default function SignUpForm() {
                   </Label>
                   <div className="relative">
                     <Input
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
                       placeholder="Enter your password"
                       type={showPassword ? "text" : "password"}
                     />

@@ -132,3 +132,7 @@ export interface AuthResponse {
   fullName: string;
   roles: string[];
 }
+
+export interface RegisterResponse {
+  userId: string;
+}
