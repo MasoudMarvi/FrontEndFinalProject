@@ -41,7 +41,7 @@ export async function login(data: LoginRequest): Promise<AuthResponse> {
 
 export async function register(data: RegisterRequest): Promise<AuthResponse> {
     try {
-        const res = await api.post<AuthResponse>('/auth/register', data);
+        const res = await api.post<AuthResponse>('/Users/CreateUser', data);
         return res.data;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {

@@ -3,27 +3,25 @@ import Checkbox from "@/components/form/input/Checkbox";
 import Input from "@/components/form/input/InputField";
 import Label from "@/components/form/Label";
 import Button from "@/components/ui/button/Button";
-import { ChevronLeftIcon, EyeCloseIcon, EyeIcon } from "@/icons";
+import { EyeCloseIcon, EyeIcon } from "@/icons";
 import Link from "next/link";
 import Image from "next/image";
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import { login } from "@/lib/api"; // ✅ import your login function
+import { login } from "@/lib/login"; // ✅ import your login function
 
 export default function SignInForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [isChecked, setIsChecked] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const router = useRouter();
 
   // Function to handle sign in
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
     setErrorMsg("");
 
     try {
@@ -39,7 +37,6 @@ export default function SignInForm() {
     } catch (error: any) {
       setErrorMsg(error.message);
     } finally {
-      setLoading(false);
     }
   };
 
