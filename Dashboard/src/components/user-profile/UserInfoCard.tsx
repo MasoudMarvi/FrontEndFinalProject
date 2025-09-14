@@ -1,93 +1,78 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useModal } from "../../hooks/useModal";
 import { Modal } from "../ui/modal";
 import Button from "../ui/button/Button";
 import Input from "../form/input/InputField";
 import Label from "../form/Label";
+import { useAuth } from "@/context/AuthContext";
 
 export default function UserInfoCard() {
   const { isOpen, openModal, closeModal } = useModal();
-  const [showPasswordSection, setShowPasswordSection] = useState(false);
-  const [isResetPasswordModalOpen, setIsResetPasswordModalOpen] = useState(false);
   
-  // Password reset states
-  const [resetStep, setResetStep] = useState(1); // 1: Enter current password, 2: Enter new password
-  const [currentPassword, setCurrentPassword] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState(false);
-
-  const handleSave = () => {
-    // Handle save logic here
-    console.log("Saving changes...");
-    closeModal();
-  };
-
-  const togglePasswordSection = () => {
-    setShowPasswordSection(!showPasswordSection);
-  };
-
-  const openResetPasswordModal = () => {
-    setIsResetPasswordModalOpen(true);
-    closeModal(); // Close the edit profile modal
-  };
-
-  const closeResetPasswordModal = () => {
-    setIsResetPasswordModalOpen(false);
-    setResetStep(1);
-    setCurrentPassword("");
-    setNewPassword("");
-    setConfirmPassword("");
-    setError("");
-    setSuccess(false);
-  };
-
-  const handleCurrentPasswordSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    // In a real application, you would verify the current password against the backend
-    // For demo purposes, we'll just proceed to the next step
-    if (currentPassword.trim() === "") {
-      setError("Please enter your current password");
-      return;
+  // Get user data from auth context
+  const { user, loading, error: authError, updateUserProfile } = useAuth();
+  
+  // Form state
+  const [formData, setFormData] = useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    phone: '',
+    bio: '',
+  });
+  
+  // Update form data when user data is loaded
+  useEffect(() => {
+    if (user) {
+      setFormData({
+        firstName: user.firstName || '',
+        lastName: user.lastName || '',
+        email: user.email || '',
+        phone: user.phone || '',
+        bio: user.bio || '',
+      });
     }
-    
-    setError("");
-    setResetStep(2);
+  }, [user]);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handlePasswordReset = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    // Validate passwords
-    if (newPassword.trim() === "" || confirmPassword.trim() === "") {
-      setError("Please fill in all fields");
-      return;
+  const handleSave = async () => {
+    try {
+      const success = await updateUserProfile(formData);
+      if (success) {
+        closeModal();
+      }
+    } catch (err) {
+      console.error("Error saving profile:", err);
     }
-    
-    if (newPassword !== confirmPassword) {
-      setError("Passwords do not match");
-      return;
-    }
-    
-    if (newPassword.length < 8) {
-      setError("Password must be at least 8 characters long");
-      return;
-    }
-    
-    // In a real application, you would submit the new password to the backend
-    console.log("Password reset submitted");
-    
-    setError("");
-    setSuccess(true);
-    
-    // Close modal after 3 seconds
-    setTimeout(() => {
-      closeResetPasswordModal();
-    }, 3000);
   };
+
+  if (loading) {
+    return (
+      <div className="p-5 border border-gray-200 rounded-2xl dark:border-gray-800 lg:p-6">
+        <div className="flex items-center justify-center py-10">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-gray-200 border-t-brand-500"></div>
+          <span className="ml-2 text-gray-500 dark:text-gray-400">Loading user information...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="p-5 border border-gray-200 rounded-2xl dark:border-gray-800 lg:p-6">
+        <div className="text-center py-10">
+          <p className="text-gray-500 dark:text-gray-400">
+            {authError || "Please log in to view your profile information"}
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-5 border border-gray-200 rounded-2xl dark:border-gray-800 lg:p-6">
@@ -103,7 +88,7 @@ export default function UserInfoCard() {
                 First Name
               </p>
               <p className="text-sm font-medium text-gray-800 dark:text-white/90">
-                Hossein
+                {user.firstName}
               </p>
             </div>
 
@@ -112,7 +97,7 @@ export default function UserInfoCard() {
                 Last Name
               </p>
               <p className="text-sm font-medium text-gray-800 dark:text-white/90">
-                Marvi
+                {user.lastName}
               </p>
             </div>
 
@@ -121,7 +106,7 @@ export default function UserInfoCard() {
                 Email address
               </p>
               <p className="text-sm font-medium text-gray-800 dark:text-white/90">
-                Mr.marvi2001@gmail.com
+                {user.email}
               </p>
             </div>
 
@@ -130,7 +115,7 @@ export default function UserInfoCard() {
                 Phone
               </p>
               <p className="text-sm font-medium text-gray-800 dark:text-white/90">
-                +98902 338 0854
+                {user.phone || 'Not specified'}
               </p>
             </div>
 
@@ -139,17 +124,7 @@ export default function UserInfoCard() {
                 Bio
               </p>
               <p className="text-sm font-medium text-gray-800 dark:text-white/90">
-                Team Manager
-              </p>
-            </div>
-            
-            {/* New Security Section */}
-            <div>
-              <p className="mb-2 text-xs leading-normal text-gray-500 dark:text-gray-400">
-                Security
-              </p>
-              <p className="text-sm font-medium text-gray-800 dark:text-white/90">
-                ••••••••••••
+                {user.bio || 'Not specified'}
               </p>
             </div>
           </div>
@@ -191,29 +166,6 @@ export default function UserInfoCard() {
           </div>
           <form className="flex flex-col">
             <div className="custom-scrollbar h-[450px] overflow-y-auto px-2 pb-3">
-              <div>
-                <h5 className="mb-5 text-lg font-medium text-gray-800 dark:text-white/90 lg:mb-6">
-                  Social Links
-                </h5>
-
-                <div className="grid grid-cols-1 gap-x-6 gap-y-5 lg:grid-cols-2">
-                  <div>
-                    <Label>Linkedin</Label>
-                    <Input
-                      type="text"
-                      defaultValue="https://www.linkedin.com"
-                    />
-                  </div>
-
-                  <div>
-                    <Label>Instagram</Label>
-                    <Input
-                      type="text"
-                      defaultValue="https://instagram.com"
-                    />
-                  </div>
-                </div>
-              </div>
               <div className="mt-7">
                 <h5 className="mb-5 text-lg font-medium text-gray-800 dark:text-white/90 lg:mb-6">
                   Personal Information
@@ -222,66 +174,53 @@ export default function UserInfoCard() {
                 <div className="grid grid-cols-1 gap-x-6 gap-y-5 lg:grid-cols-2">
                   <div className="col-span-2 lg:col-span-1">
                     <Label>First Name</Label>
-                    <Input type="text" defaultValue="Hossein" />
+                    <Input 
+                      type="text" 
+                      name="firstName"
+                      value={formData.firstName}
+                      onChange={handleInputChange}
+                    />
                   </div>
 
                   <div className="col-span-2 lg:col-span-1">
                     <Label>Last Name</Label>
-                    <Input type="text" defaultValue="Marvi" />
+                    <Input 
+                      type="text" 
+                      name="lastName"
+                      value={formData.lastName}
+                      onChange={handleInputChange}
+                    />
                   </div>
 
                   <div className="col-span-2 lg:col-span-1">
                     <Label>Email Address</Label>
-                    <Input type="text" defaultValue="Mr.marvi2001@gmail.com" />
+                    <Input 
+                      type="text" 
+                      name="email"
+                      value={formData.email}
+                      onChange={handleInputChange}
+                    />
                   </div>
 
                   <div className="col-span-2 lg:col-span-1">
                     <Label>Phone</Label>
-                    <Input type="text" defaultValue="+98 902 338 0854" />
+                    <Input 
+                      type="text" 
+                      name="phone"
+                      value={formData.phone}
+                      onChange={handleInputChange}
+                    />
                   </div>
 
                   <div className="col-span-2">
                     <Label>Bio</Label>
-                    <Input type="text" defaultValue="Team Manager" />
+                    <Input 
+                      type="text" 
+                      name="bio"
+                      value={formData.bio}
+                      onChange={handleInputChange}
+                    />
                   </div>
-                </div>
-              </div>
-              
-              {/* New Security Section */}
-              <div className="mt-7">
-                <div className="flex items-center justify-between mb-5">
-                  <h5 className="text-lg font-medium text-gray-800 dark:text-white/90">
-                    Security
-                  </h5>
-                  <Button 
-                    size="sm" 
-                    variant="outline" 
-                    onClick={openResetPasswordModal}
-                    className="flex items-center gap-2"
-                  >
-                    <svg 
-                      xmlns="http://www.w3.org/2000/svg" 
-                      className="w-4 h-4" 
-                      fill="none" 
-                      viewBox="0 0 24 24" 
-                      stroke="currentColor"
-                    >
-                      <path 
-                        strokeLinecap="round" 
-                        strokeLinejoin="round" 
-                        strokeWidth={2} 
-                        d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" 
-                      />
-                    </svg>
-                    Reset Password
-                  </Button>
-                </div>
-                
-                <div className="p-4 rounded-lg bg-gray-50 dark:bg-gray-800">
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    For security reasons, password changes are handled separately. 
-                    Click the "Reset Password" button to update your password.
-                  </p>
                 </div>
               </div>
             </div>
@@ -294,121 +233,6 @@ export default function UserInfoCard() {
               </Button>
             </div>
           </form>
-        </div>
-      </Modal>
-      
-      {/* Reset Password Modal */}
-      <Modal isOpen={isResetPasswordModalOpen} onClose={closeResetPasswordModal} className="max-w-[500px] m-4">
-        <div className="no-scrollbar relative w-full max-w-[500px] overflow-y-auto rounded-3xl bg-white p-6 dark:bg-gray-900">
-          <div className="mb-6">
-            <h4 className="mb-2 text-xl font-semibold text-gray-800 dark:text-white/90">
-              Reset Password
-            </h4>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              {resetStep === 1 
-                ? "Enter your current password to proceed." 
-                : "Create a new password for your account."}
-            </p>
-          </div>
-          
-          {success ? (
-            <div className="p-4 mb-6 text-sm text-green-700 bg-green-100 rounded-lg dark:bg-green-200 dark:text-green-800">
-              <p className="text-center">
-                Your password has been updated successfully!
-              </p>
-            </div>
-          ) : (
-            <>
-              {error && (
-                <div className="p-4 mb-4 text-sm text-red-700 bg-red-100 rounded-lg dark:bg-red-200 dark:text-red-800">
-                  <p>{error}</p>
-                </div>
-              )}
-              
-              {resetStep === 1 ? (
-                <form onSubmit={handleCurrentPasswordSubmit}>
-                  <div className="mb-6">
-                    <Label>
-                      Current Password <span className="text-error-500">*</span>
-                    </Label>
-                    <Input 
-                      type="password" 
-                      placeholder="Enter your current password"
-                      value={currentPassword}
-                      onChange={(e) => setCurrentPassword(e.target.value)}
-                      required
-                    />
-                  </div>
-                  
-                  <div className="flex justify-end gap-3">
-                    <Button 
-                      size="sm" 
-                      variant="outline" 
-                      onClick={closeResetPasswordModal}
-                    >
-                      Cancel
-                    </Button>
-                    <Button 
-                      size="sm" 
-                      type="submit"
-                    >
-                      Continue
-                    </Button>
-                  </div>
-                </form>
-              ) : (
-                <form onSubmit={handlePasswordReset}>
-                  <div className="space-y-6 mb-6">
-                    <div>
-                      <Label>
-                        New Password <span className="text-error-500">*</span>
-                      </Label>
-                      <Input 
-                        type="password" 
-                        placeholder="Enter new password"
-                        value={newPassword}
-                        onChange={(e) => setNewPassword(e.target.value)}
-                        required
-                        minLength={8}
-                      />
-                      <p className="mt-1 text-xs text-gray-500">
-                        Password must be at least 8 characters long
-                      </p>
-                    </div>
-                    
-                    <div>
-                      <Label>
-                        Confirm Password <span className="text-error-500">*</span>
-                      </Label>
-                      <Input 
-                        type="password" 
-                        placeholder="Confirm new password"
-                        value={confirmPassword}
-                        onChange={(e) => setConfirmPassword(e.target.value)}
-                        required
-                      />
-                    </div>
-                  </div>
-                  
-                  <div className="flex justify-end gap-3">
-                    <Button 
-                      size="sm" 
-                      variant="outline" 
-                      onClick={() => setResetStep(1)}
-                    >
-                      Back
-                    </Button>
-                    <Button 
-                      size="sm" 
-                      type="submit"
-                    >
-                      Update Password
-                    </Button>
-                  </div>
-                </form>
-              )}
-            </>
-          )}
         </div>
       </Modal>
     </div>

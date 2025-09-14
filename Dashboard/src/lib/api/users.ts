@@ -17,7 +17,58 @@ export async function getUsers(): Promise<UserResponse[]> {
     throw new Error(err.response?.data?.message || 'Failed to get users');
   }
 }
+// Get current logged-in user profile
+export async function getCurrentUser(): Promise<UserProfile> {
+  try {
+    const res = await api.get<UserProfile>('/Users/GetCurrentUser');
+    return res.data;
+  } catch (err: any) {
+    throw new Error(err.response?.data?.message || 'Failed to get current user');
+  }
+}
 
+// Update user password
+export async function changePassword(data: {
+  userId: string;
+  currentPassword: string;
+  newPassword: string;
+}): Promise<void> {
+  try {
+    await api.post('/Users/ChangePassword', data);
+  } catch (err: any) {
+    throw new Error(err.response?.data?.message || 'Password change failed');
+  }
+}
+
+// Update user profile image
+export async function updateProfileImage(userId: string, imageFile: File): Promise<void> {
+  try {
+    const formData = new FormData();
+    formData.append('image', imageFile);
+    formData.append('userId', userId);
+    
+    await api.post('/Users/UpdateProfileImage', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    });
+  } catch (err: any) {
+    throw new Error(err.response?.data?.message || 'Profile image update failed');
+  }
+}
+
+// Define the extended user profile type
+export interface UserProfile extends UserResponse {
+  phone?: string;
+  bio?: string;
+  country?: string;
+  city?: string;
+  postalCode?: string;
+  taxId?: string;
+  profileImageUrl?: string;
+  linkedinUrl?: string;
+  instagramUrl?: string;
+}
 export async function createUser(data: CreateUserCommand): Promise<AuthResponse> {
   try {
     const res = await api.post<AuthResponse>('/Users/CreateUser', data);
@@ -63,4 +114,6 @@ export async function register(data: {
   } catch (err: any) {
     throw new Error(err.response?.data?.message || 'Registration failed');
   }
+
+  
 }

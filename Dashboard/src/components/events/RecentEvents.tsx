@@ -1,3 +1,6 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import {
   Table,
   TableBody,
@@ -7,68 +10,134 @@ import {
 } from "../ui/table";
 import Badge from "../ui/badge/Badge";
 import Image from "next/image";
+import { getEvents } from "@/lib/api/events";
+import { EventDto } from "@/lib/api/types";
 
-// Define the TypeScript interface for the events
-interface Event {
-  id: number;
+// Define the TypeScript interface for our formatted event data
+interface FormattedEvent {
+  id: string;
   title: string;
   category: string;
   date: string;
-  location: string;
   status: "Upcoming" | "In Progress" | "Completed" | "Cancelled";
   image: string;
 }
 
-// Sample event data
-const eventsData: Event[] = [
-  {
-    id: 1,
-    title: "Summer Music Festival",
-    category: "Music",
-    date: "Jul 15, 2025",
-    location: "Shariati",
-    status: "Upcoming",
-    image: "/images/event/event-01.jpg", 
-  },
-  {
-    id: 2,
-    title: "Tech Conference 2025",
-    category: "Technology",
-    date: "Aug 10, 2025",
-    location: "TehranPars",
-    status: "Upcoming",
-    image: "/images/event/event-02.jpg",
-  },
-  {
-    id: 3,
-    title: "Food & Wine Festival",
-    category: "Food",
-    date: "Sep 5, 2025",
-    location: "Narmak",
-    status: "Upcoming",
-    image: "/images/event/event-03.jpg",
-  },
-  {
-    id: 4,
-    title: "Art Exhibition",
-    category: "Art",
-    date: "Jun 20, 2025",
-    location: "Ekbatan",
-    status: "Cancelled",
-    image: "/images/event/event-04.jpg",
-  },
-  {
-    id: 5,
-    title: "Charity Marathon",
-    category: "Sports",
-    date: "May 30, 2025",
-    location: "Vali-Asr",
-    status: "Upcoming",
-    image: "/images/event/event-05.jpg",
-  },
-];
+// Placeholder image for events without images
+const DEFAULT_IMAGE = "/images/event/event-default.jpg";
 
 export default function RecentEvents() {
+  const [events, setEvents] = useState<FormattedEvent[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchRecentEvents = async () => {
+      try {
+        setLoading(true);
+        // Get events from backend, limit to 5
+        const eventsData = await getEvents();
+        
+        // Format the events data
+        const formattedEvents: FormattedEvent[] = eventsData
+          .map((event: EventDto) => {
+            // Calculate event status based on dates
+            const now = new Date();
+            const startDate = new Date(event.startDateTime);
+            const endDate = new Date(event.endDateTime);
+            
+            let status: "Upcoming" | "In Progress" | "Completed" | "Cancelled" = "Upcoming";
+            if (now < startDate) {
+              status = "Upcoming";
+            } else if (now >= startDate && now <= endDate) {
+              status = "In Progress";
+            } else if (now > endDate) {
+              status = "Completed";
+            }
+            
+            return {
+              id: event.eventId,
+              title: event.title || "Untitled Event",
+              category: event.categoryName || "Uncategorized",
+              date: new Date(event.startDateTime).toLocaleDateString("en-US", {
+                month: "short",
+                day: "numeric",
+                year: "numeric"
+              }),
+              status,
+              // Use a placeholder image or an actual event image if available
+              image: DEFAULT_IMAGE // In a real implementation, you'd get this from your event data
+            };
+          })
+          // Sort by date (newest first)
+          .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+          // Limit to 5 events
+          .slice(0, 5);
+        
+        setEvents(formattedEvents);
+        setLoading(false);
+      } catch (err) {
+        console.error("Error fetching events:", err);
+        setError("Failed to load recent events");
+        setLoading(false);
+      }
+    };
+
+    fetchRecentEvents();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white px-4 pb-3 pt-4 dark:border-gray-800 dark:bg-white/[0.03] sm:px-6">
+        <div className="flex flex-col gap-2 mb-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">
+              Recent Events
+            </h3>
+          </div>
+        </div>
+        <div className="flex items-center justify-center p-8">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-gray-200 border-t-brand-500"></div>
+          <span className="ml-2 text-gray-500 dark:text-gray-400">Loading events...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white px-4 pb-3 pt-4 dark:border-gray-800 dark:bg-white/[0.03] sm:px-6">
+        <div className="flex flex-col gap-2 mb-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">
+              Recent Events
+            </h3>
+          </div>
+        </div>
+        <div className="flex items-center justify-center p-8 text-red-500">
+          <span>{error}</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (events.length === 0) {
+    return (
+      <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white px-4 pb-3 pt-4 dark:border-gray-800 dark:bg-white/[0.03] sm:px-6">
+        <div className="flex flex-col gap-2 mb-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">
+              Recent Events
+            </h3>
+          </div>
+        </div>
+        <div className="flex items-center justify-center p-8 text-gray-500 dark:text-gray-400">
+          <span>No events found</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white px-4 pb-3 pt-4 dark:border-gray-800 dark:bg-white/[0.03] sm:px-6">
       <div className="flex flex-col gap-2 mb-4 sm:flex-row sm:items-center sm:justify-between">
@@ -143,7 +212,7 @@ export default function RecentEvents() {
                 isHeader
                 className="py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400"
               >
-                Location
+                Category
               </TableCell>
               <TableCell
                 isHeader
@@ -156,7 +225,7 @@ export default function RecentEvents() {
 
           {/* Table Body */}
           <TableBody className="divide-y divide-gray-100 dark:divide-gray-800">
-            {eventsData.map((event) => (
+            {events.map((event) => (
               <TableRow key={event.id} className="">
                 <TableCell className="py-3">
                   <div className="flex items-center gap-3">
@@ -183,7 +252,16 @@ export default function RecentEvents() {
                   {event.date}
                 </TableCell>
                 <TableCell className="py-3 text-gray-500 text-theme-sm dark:text-gray-400">
-                  {event.location}
+                  <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                    event.category === 'Music' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
+                    event.category === 'Technology' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' :
+                    event.category === 'Food' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
+                    event.category === 'Art' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' :
+                    event.category === 'Sports' ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' :
+                    'bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400'
+                  }`}>
+                    {event.category}
+                  </span>
                 </TableCell>
                 <TableCell className="py-3 text-gray-500 text-theme-sm dark:text-gray-400">
                   <Badge
