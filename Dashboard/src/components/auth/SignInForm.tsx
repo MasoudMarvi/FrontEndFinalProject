@@ -9,7 +9,7 @@ import Image from "next/image";
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import { login } from "@/lib/login"; // ✅ import your login function
+import { login } from "@/lib/api/auth";
 
 export default function SignInForm() {
   const [showPassword, setShowPassword] = useState(false);
