@@ -5,35 +5,60 @@ import { Modal } from "../ui/modal";
 import Button from "../ui/button/Button";
 import Input from "../form/input/InputField";
 import Label from "../form/Label";
-import { useAuth } from "@/context/AuthContext";
+import axios from "axios";
 
 export default function UserInfoCard() {
   const { isOpen, openModal, closeModal } = useModal();
+  const [isClient, setIsClient] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   
-  // Get user data from auth context
-  const { user, loading, error: authError, updateUserProfile } = useAuth();
+  // User data state
+  const [userData, setUserData] = useState({
+    userId: '',
+    fullName: '',
+    email: '',
+  });
   
   // Form state
   const [formData, setFormData] = useState({
-    firstName: '',
-    lastName: '',
+    fullName: '',
     email: '',
-    phone: '',
-    bio: '',
   });
-  
-  // Update form data when user data is loaded
+
+  // Set isClient to true when component mounts
   useEffect(() => {
-    if (user) {
-      setFormData({
-        firstName: user.firstName || '',
-        lastName: user.lastName || '',
-        email: user.email || '',
-        phone: user.phone || '',
-        bio: user.bio || '',
-      });
+    setIsClient(true);
+  }, []);
+  
+  // Get user data from localStorage when on client
+  useEffect(() => {
+    if (isClient) {
+      try {
+        setLoading(true);
+        const userId = localStorage.getItem('userId') || '';
+        const fullName = localStorage.getItem('fullName') || '';
+        const email = localStorage.getItem('email') || '';
+        
+        setUserData({
+          userId,
+          fullName,
+          email
+        });
+        
+        setFormData({
+          fullName,
+          email
+        });
+        
+        setLoading(false);
+      } catch (err) {
+        console.error("Error accessing localStorage:", err);
+        setError("Could not load user data");
+        setLoading(false);
+      }
     }
-  }, [user]);
+  }, [isClient]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -42,16 +67,30 @@ export default function UserInfoCard() {
 
   const handleSave = async () => {
     try {
-      const success = await updateUserProfile(formData);
-      if (success) {
-        closeModal();
-      }
+      // You would implement an API call to update the user profile
+      // For now, just update localStorage to demonstrate the functionality
+      localStorage.setItem('fullName', formData.fullName);
+      localStorage.setItem('email', formData.email);
+      
+      // Update the displayed user data
+      setUserData(prev => ({
+        ...prev,
+        fullName: formData.fullName,
+        email: formData.email
+      }));
+      
+      // Close the modal
+      closeModal();
+      
+      // In a real implementation, you would have an API call like:
+      // const response = await axios.put('/api/users/profile', formData);
+      // if successful, update localStorage and state
     } catch (err) {
       console.error("Error saving profile:", err);
     }
   };
 
-  if (loading) {
+  if (loading && !isClient) {
     return (
       <div className="p-5 border border-gray-200 rounded-2xl dark:border-gray-800 lg:p-6">
         <div className="flex items-center justify-center py-10">
@@ -62,12 +101,12 @@ export default function UserInfoCard() {
     );
   }
 
-  if (!user) {
+  if (error) {
     return (
       <div className="p-5 border border-gray-200 rounded-2xl dark:border-gray-800 lg:p-6">
         <div className="text-center py-10">
           <p className="text-gray-500 dark:text-gray-400">
-            {authError || "Please log in to view your profile information"}
+            {error}
           </p>
         </div>
       </div>
@@ -83,48 +122,21 @@ export default function UserInfoCard() {
           </h4>
 
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:gap-7 2xl:gap-x-32">
-            <div>
+            <div className="col-span-2">
               <p className="mb-2 text-xs leading-normal text-gray-500 dark:text-gray-400">
-                First Name
+                Full Name
               </p>
               <p className="text-sm font-medium text-gray-800 dark:text-white/90">
-                {user.firstName}
+                {userData.fullName || 'Not specified'}
               </p>
             </div>
 
-            <div>
-              <p className="mb-2 text-xs leading-normal text-gray-500 dark:text-gray-400">
-                Last Name
-              </p>
-              <p className="text-sm font-medium text-gray-800 dark:text-white/90">
-                {user.lastName}
-              </p>
-            </div>
-
-            <div>
+            <div className="col-span-2">
               <p className="mb-2 text-xs leading-normal text-gray-500 dark:text-gray-400">
                 Email address
               </p>
               <p className="text-sm font-medium text-gray-800 dark:text-white/90">
-                {user.email}
-              </p>
-            </div>
-
-            <div>
-              <p className="mb-2 text-xs leading-normal text-gray-500 dark:text-gray-400">
-                Phone
-              </p>
-              <p className="text-sm font-medium text-gray-800 dark:text-white/90">
-                {user.phone || 'Not specified'}
-              </p>
-            </div>
-
-            <div>
-              <p className="mb-2 text-xs leading-normal text-gray-500 dark:text-gray-400">
-                Bio
-              </p>
-              <p className="text-sm font-medium text-gray-800 dark:text-white/90">
-                {user.bio || 'Not specified'}
+                {userData.email || 'Not specified'}
               </p>
             </div>
           </div>
@@ -165,59 +177,29 @@ export default function UserInfoCard() {
             </p>
           </div>
           <form className="flex flex-col">
-            <div className="custom-scrollbar h-[450px] overflow-y-auto px-2 pb-3">
+            <div className="custom-scrollbar overflow-y-auto px-2 pb-3">
               <div className="mt-7">
                 <h5 className="mb-5 text-lg font-medium text-gray-800 dark:text-white/90 lg:mb-6">
                   Personal Information
                 </h5>
 
                 <div className="grid grid-cols-1 gap-x-6 gap-y-5 lg:grid-cols-2">
-                  <div className="col-span-2 lg:col-span-1">
-                    <Label>First Name</Label>
+                  <div className="col-span-2">
+                    <Label>Full Name</Label>
                     <Input 
                       type="text" 
-                      name="firstName"
-                      value={formData.firstName}
-                      onChange={handleInputChange}
-                    />
-                  </div>
-
-                  <div className="col-span-2 lg:col-span-1">
-                    <Label>Last Name</Label>
-                    <Input 
-                      type="text" 
-                      name="lastName"
-                      value={formData.lastName}
-                      onChange={handleInputChange}
-                    />
-                  </div>
-
-                  <div className="col-span-2 lg:col-span-1">
-                    <Label>Email Address</Label>
-                    <Input 
-                      type="text" 
-                      name="email"
-                      value={formData.email}
-                      onChange={handleInputChange}
-                    />
-                  </div>
-
-                  <div className="col-span-2 lg:col-span-1">
-                    <Label>Phone</Label>
-                    <Input 
-                      type="text" 
-                      name="phone"
-                      value={formData.phone}
+                      name="fullName"
+                      value={formData.fullName}
                       onChange={handleInputChange}
                     />
                   </div>
 
                   <div className="col-span-2">
-                    <Label>Bio</Label>
+                    <Label>Email Address</Label>
                     <Input 
                       type="text" 
-                      name="bio"
-                      value={formData.bio}
+                      name="email"
+                      value={formData.email}
                       onChange={handleInputChange}
                     />
                   </div>
