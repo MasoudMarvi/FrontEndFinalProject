@@ -1,93 +1,50 @@
 "use client";
 
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import PageBreadCrumb from '@/components/common/PageBreadCrumb';
-import { GoogleMap, Marker } from '@react-google-maps/api'; // Removed LoadScript
+import { GoogleMap, Marker } from '@react-google-maps/api';
 import Image from 'next/image';
-import { useGoogleMaps } from '@/context/GoogleMapsContext'; // Added this import
+import { useGoogleMaps } from '@/context/GoogleMapsContext';
+import { getEventById, updateEvent, deleteEvent } from '@/lib/api/events';
+import { EventDetailDto, UpdateEventCommand } from '@/lib/api/types';
+import { getEventCategories } from '@/lib/api/eventCategories';
 
-// Enhanced sample event data with multiple images
-const sampleEvents = [
-  {
-    id: '1',
-    title: 'Summer Music Festival',
-    description: 'Annual music festival featuring local and international artists across multiple stages. Join us for a day of great music, food, and fun activities for all ages.',
-    location: { 
-      name: 'City Park',
-      lat: 35.7219, 
-      lng: 51.3347 
-    },
-    date: '2025-07-15',
-    time: '14:00',
-    endTime: '23:00',
-    category: 'Music',
-    images: [
-      '/images/event/event-01.jpg',
-      '/images/event/event-01.jpg',
-      '/images/event/event-01.jpg',
-    ],
-    isPublic: true,
-    organizer: 'John Smith',
-    environmentalData: {
-      airQuality: {
-        value: 42,
-        status: 'Good'
-      },
-      temperature: {
-        value: 28,
-        unit: 'C',
-        status: 'Moderate'
-      },
-      noise: {
-        value: 76,
-        unit: 'dB',
-        status: 'High'
-      },
-      lastUpdated: '2023-09-11T14:32:00Z'
-    }
-  },
-  {
-    id: '2',
-    title: 'Tech Conference 2025',
-    description: 'The biggest tech conference of the year featuring industry leaders, workshops, and networking opportunities.',
-    location: { 
-      name: 'Convention Center',
-      lat: 35.7246, 
-      lng: 51.3853 
-    },
-    date: '2025-08-10',
-    time: '09:00',
-    endTime: '18:00',
-    category: 'Technology',
-    images: [
-      '/images/event/event-02.jpg',
-      '/images/event/event-02.jpg',
-    ],
-    isPublic: true,
-    organizer: 'Sarah Johnson',
-    environmentalData: null
-  },
-];
-
-// Placeholder images for development (you can replace these with your actual images)
-const placeholderImages = [
-  'https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?ixlib=rb-4.0.3&auto=format&fit=crop&w=1200&h=630&q=80',
-  'https://images.unsplash.com/photo-1540039155733-5bb30b53aa14?ixlib=rb-4.0.3&auto=format&fit=crop&w=1200&h=630&q=80',
-  'https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?ixlib=rb-4.0.3&auto=format&fit=crop&w=1200&h=630&q=80',
-];
+// Default placeholder image when no images are available
+const DEFAULT_IMAGE = '/images/event/event-01.jpg';
 
 const containerStyle = {
   width: '100%',
   height: '300px'
 };
 
+interface EnvironmentalData {
+  airQuality?: {
+    value: number;
+    status: string;
+  };
+  temperature?: {
+    value: number;
+    unit: string;
+    status: string;
+  };
+  noise?: {
+    value: number;
+    unit: string;
+    status: string;
+  };
+  lastUpdated?: string;
+}
+
 export default function EventDetailsPage() {
-  const { isLoaded } = useGoogleMaps(); // Using the Google Maps context
+  const { isLoaded } = useGoogleMaps();
+  const router = useRouter();
   const params = useParams();
   const eventId = params.eventId as string;
-  const [event, setEvent] = useState<any>(null);
+  
+  const [event, setEvent] = useState<EventDetailDto | null>(null);
+  const [categories, setCategories] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isEnvDataModalOpen, setIsEnvDataModalOpen] = useState(false);
@@ -95,75 +52,149 @@ export default function EventDetailsPage() {
   const [editForm, setEditForm] = useState<any>(null);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [newImageFiles, setNewImageFiles] = useState<File[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [environmentalData, setEnvironmentalData] = useState<EnvironmentalData | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  
+  // Create a list of mock images since backend doesn't support images yet
+  const [eventImages, setEventImages] = useState<string[]>([
+    DEFAULT_IMAGE,
+  ]);
+  
   const fileInputRef = useRef<HTMLInputElement>(null);
   
+  // Fetch event details from backend
   useEffect(() => {
-    // Simulate fetching event details
-    const currentEvent = sampleEvents.find(e => e.id === eventId);
-    
-    // Use the actual event data if found, otherwise create a placeholder with ID
-    const eventData = currentEvent || {
-      id: eventId,
-      title: 'Event not found',
-      description: 'This event may have been deleted or does not exist.',
-      location: { lat: 0, lng: 0 },
-      date: new Date().toISOString().split('T')[0],
-      category: 'Unknown',
-      images: [],
-    };
-    
-    // If we're in development and the event has no images, use placeholders
-    if (process.env.NODE_ENV === 'development' && (!eventData.images || eventData.images.length === 0)) {
-      eventData.images = placeholderImages;
+    async function fetchEventData() {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        // Get event details
+        const eventData = await getEventById(eventId);
+        setEvent(eventData);
+        
+        // Initialize form data for editing
+        setEditForm({
+          ...eventData,
+          location: {
+            name: eventData.title, // Using title as location name since backend doesn't have separate location name
+            lat: eventData.latitude,
+            lng: eventData.longitude
+          },
+          date: new Date(eventData.startDateTime).toISOString().split('T')[0],
+          time: new Date(eventData.startDateTime).toTimeString().substring(0, 5),
+          endTime: new Date(eventData.endDateTime).toTimeString().substring(0, 5),
+          category: eventData.categoryName,
+          environmentalData: environmentalData
+        });
+        
+        // Get categories for dropdown
+        const categoriesData = await getEventCategories();
+        setCategories(categoriesData);
+        
+      } catch (err: any) {
+        console.error("Error fetching event:", err);
+        setError(err.message || "Failed to load event details");
+      } finally {
+        setLoading(false);
+      }
     }
     
-    setEvent(eventData);
-    setEditForm(eventData);
-    setLoading(false);
+    fetchEventData();
   }, [eventId]);
+  
+  const formatDateForDisplay = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString();
+  };
+  
+  const formatTimeForDisplay = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
 
-  const handleEditSubmit = (e: React.FormEvent) => {
+  const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (editForm) {
-      // In a real app, you would upload the images to a server here
-      // For now, we'll just update the local state
-      setEvent({
-        ...editForm,
-        // Only update images if new ones were selected
-        images: newImageFiles.length > 0 
-          ? newImageFiles.map(file => URL.createObjectURL(file)) 
-          : editForm.images
-      });
+    if (!editForm || !event) return;
+    
+    try {
+      // Convert form data to UpdateEventCommand
+      const startDate = new Date(`${editForm.date}T${editForm.time}`);
+      const endDate = new Date(`${editForm.date}T${editForm.endTime}`);
+      
+      const updateData: UpdateEventCommand = {
+        eventId: event.eventId,
+        title: editForm.title,
+        description: editForm.description,
+        latitude: parseFloat(editForm.location.lat),
+        longitude: parseFloat(editForm.location.lng),
+        startDateTime: startDate.toISOString(),
+        endDateTime: endDate.toISOString(),
+        isPublic: editForm.isPublic,
+        categoryId: editForm.categoryId
+      };
+      
+      // Update event
+      await updateEvent(event.eventId, updateData);
+      
+      // If new images were uploaded (not currently sent to backend)
+      if (newImageFiles.length > 0) {
+        const newImageUrls = newImageFiles.map(file => URL.createObjectURL(file));
+        setEventImages([...newImageUrls]);
+      }
+      
+      // Refresh event data
+      const updatedEvent = await getEventById(eventId);
+      setEvent(updatedEvent);
+      
       setIsEditModalOpen(false);
       setNewImageFiles([]);
+      
+    } catch (err: any) {
+      console.error("Error updating event:", err);
+      setError(err.message || "Failed to update event");
     }
   };
 
   const handleEnvDataSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (editForm && editForm.environmentalData) {
-      setEvent({
-        ...event,
-        environmentalData: editForm.environmentalData
-      });
+      setEnvironmentalData(editForm.environmentalData);
       setIsEnvDataModalOpen(false);
+      
+      // Note: This is just storing the environmental data in local state
+      // In a real implementation, you would send this to the backend
     }
   };
 
   const handleImageSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (newImageFiles.length > 0) {
-      // In a real app, you would upload the images to a server here
-      // For now, we'll just update the local state with object URLs
+      // Create object URLs for new images
       const newImageUrls = newImageFiles.map(file => URL.createObjectURL(file));
       
-      setEvent({
-        ...event,
-        images: [...(event.images || []), ...newImageUrls]
-      });
+      // Update the event images (in a real app, you would upload these to a server)
+      setEventImages([...eventImages, ...newImageUrls]);
       
       setIsImagesModalOpen(false);
       setNewImageFiles([]);
+    }
+  };
+
+  const handleDeleteEvent = async () => {
+    if (!event) return;
+    
+    if (window.confirm("Are you sure you want to delete this event? This action cannot be undone.")) {
+      try {
+        setIsDeleting(true);
+        await deleteEvent(event.eventId);
+        router.push('/admin-dashboard'); // Redirect to dashboard after successful deletion
+      } catch (err: any) {
+        console.error("Error deleting event:", err);
+        setError(err.message || "Failed to delete event");
+        setIsDeleting(false);
+      }
     }
   };
 
@@ -179,14 +210,7 @@ export default function EventDetailsPage() {
   };
 
   const handleRemoveExistingImage = (index: number) => {
-    if (editForm && editForm.images) {
-      const updatedImages = [...editForm.images];
-      updatedImages.splice(index, 1);
-      setEditForm({
-        ...editForm,
-        images: updatedImages
-      });
-    }
+    setEventImages(prev => prev.filter((_, i) => i !== index));
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -238,14 +262,14 @@ export default function EventDetailsPage() {
   };
 
   const nextImage = () => {
-    if (event?.images?.length > 0) {
-      setCurrentImageIndex((prev) => (prev + 1) % event.images.length);
+    if (eventImages.length > 0) {
+      setCurrentImageIndex((prev) => (prev + 1) % eventImages.length);
     }
   };
 
   const prevImage = () => {
-    if (event?.images?.length > 0) {
-      setCurrentImageIndex((prev) => (prev - 1 + event.images.length) % event.images.length);
+    if (eventImages.length > 0) {
+      setCurrentImageIndex((prev) => (prev - 1 + eventImages.length) % eventImages.length);
     }
   };
   
@@ -257,10 +281,12 @@ export default function EventDetailsPage() {
     );
   }
   
-  if (!event) {
+  if (error || !event) {
     return (
       <div className="flex flex-col items-center justify-center h-64">
-        <h1 className="text-xl font-bold text-gray-800 dark:text-white mb-4">Event not found</h1>
+        <h1 className="text-xl font-bold text-gray-800 dark:text-white mb-4">
+          {error || "Event not found"}
+        </h1>
         <Link 
           href="/admin-dashboard" 
           className="text-brand-500 hover:text-brand-600"
@@ -292,24 +318,24 @@ export default function EventDetailsPage() {
                 onClick={() => setIsEnvDataModalOpen(true)}
                 className="text-sm px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700"
               >
-                {event.environmentalData ? 'Edit Environmental Data' : 'Add Environmental Data'}
+                {environmentalData ? 'Edit Environmental Data' : 'Add Environmental Data'}
               </button>
             </div>
           </div>
           
           {/* Event Images Carousel */}
-          {event.images && event.images.length > 0 ? (
+          {eventImages.length > 0 ? (
             <div className="relative mb-6">
               <div className="relative h-64 md:h-80 w-full rounded-lg overflow-hidden">
                 <Image
-                  src={event.images[currentImageIndex]}
+                  src={eventImages[currentImageIndex]}
                   alt={`${event.title} - Image ${currentImageIndex + 1}`}
                   fill
                   className="object-cover"
                 />
                 
                 {/* Image navigation arrows */}
-                {event.images.length > 1 && (
+                {eventImages.length > 1 && (
                   <>
                     <button 
                       onClick={prevImage}
@@ -334,9 +360,9 @@ export default function EventDetailsPage() {
               </div>
               
               {/* Thumbnail indicators */}
-              {event.images.length > 1 && (
+              {eventImages.length > 1 && (
                 <div className="flex justify-center mt-4 gap-2">
-                  {event.images.map((_, index) => (
+                  {eventImages.map((_, index) => (
                     <button
                       key={index}
                       onClick={() => setCurrentImageIndex(index)}
@@ -389,14 +415,14 @@ export default function EventDetailsPage() {
               <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 mb-1">Category</h3>
               <p className="text-gray-800 dark:text-white/90">
                 <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                  event.category === 'Music' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
-                  event.category === 'Technology' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' :
-                  event.category === 'Food' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
-                  event.category === 'Art' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' :
-                  event.category === 'Sports' ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' :
+                  event.categoryName === 'Music' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
+                  event.categoryName === 'Technology' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' :
+                  event.categoryName === 'Food' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
+                  event.categoryName === 'Art' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' :
+                  event.categoryName === 'Sports' ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' :
                   'bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400'
                 }`}>
-                  {event.category}
+                  {event.categoryName}
                 </span>
               </p>
             </div>
@@ -404,36 +430,36 @@ export default function EventDetailsPage() {
             <div>
               <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 mb-1">Date & Time</h3>
               <p className="text-gray-800 dark:text-white/90">
-                {new Date(event.date).toLocaleDateString()} • {event.time || '00:00'} - {event.endTime || '00:00'}
+                {formatDateForDisplay(event.startDateTime)} • {formatTimeForDisplay(event.startDateTime)} - {formatTimeForDisplay(event.endDateTime)}
               </p>
             </div>
             
             <div>
               <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 mb-1">Location</h3>
               <p className="text-gray-800 dark:text-white/90">
-                {event.location.name || 'Unnamed Location'}
+                {event.title} {/* Using event title as location name */}
               </p>
             </div>
             
             <div>
               <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 mb-1">Organizer</h3>
               <p className="text-gray-800 dark:text-white/90">
-                {event.organizer || 'Unknown Organizer'}
+                {event.creatorName || 'Unknown Organizer'}
               </p>
             </div>
           </div>
           
-          {/* Location Map - Updated to use GoogleMapsContext */}
+          {/* Location Map */}
           <div>
             <h2 className="text-lg font-semibold text-gray-800 dark:text-white/90 mb-4">Location</h2>
             <div className="w-full h-[300px] rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700">
               {isLoaded ? (
                 <GoogleMap
                   mapContainerStyle={containerStyle}
-                  center={{ lat: event.location.lat, lng: event.location.lng }}
+                  center={{ lat: event.latitude, lng: event.longitude }}
                   zoom={14}
                 >
-                  <Marker position={{ lat: event.location.lat, lng: event.location.lng }} />
+                  <Marker position={{ lat: event.latitude, lng: event.longitude }} />
                 </GoogleMap>
               ) : (
                 <div className="w-full h-full flex items-center justify-center bg-gray-100 dark:bg-gray-800">
@@ -442,7 +468,7 @@ export default function EventDetailsPage() {
               )}
             </div>
             <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-              Coordinates: {event.location.lat}, {event.location.lng}
+              Coordinates: {event.latitude}, {event.longitude}
             </p>
           </div>
           
@@ -454,7 +480,7 @@ export default function EventDetailsPage() {
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clipRule="evenodd" />
               </svg>
-              Join Chat
+              Join Chat ({event.chatMessageCount} messages)
             </Link>
             
             <Link 
@@ -474,60 +500,60 @@ export default function EventDetailsPage() {
               onClick={() => setIsEnvDataModalOpen(true)}
               className="text-xs px-2 py-1 bg-gray-100 text-gray-700 rounded hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
             >
-              {event.environmentalData ? 'Edit' : 'Add'}
+              {environmentalData ? 'Edit' : 'Add'}
             </button>
           </div>
           
-          {event.environmentalData ? (
+          {environmentalData ? (
             <div className="space-y-4">
               {/* Air Quality */}
-              {event.environmentalData.airQuality && (
+              {environmentalData.airQuality && (
                 <div className="p-4 rounded-lg bg-gray-50 dark:bg-gray-800/50 border border-gray-100 dark:border-gray-800">
                   <div className="flex items-center justify-between mb-2">
                     <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">Air Quality Index</h4>
                     <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                      event.environmentalData.airQuality.status === 'Good' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
-                      event.environmentalData.airQuality.status === 'Moderate' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' :
+                      environmentalData.airQuality.status === 'Good' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
+                      environmentalData.airQuality.status === 'Moderate' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' :
                       'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
                     }`}>
-                      {event.environmentalData.airQuality.status}
+                      {environmentalData.airQuality.status}
                     </span>
                   </div>
                   <div className="flex items-end">
                     <span className="text-2xl font-bold text-gray-800 dark:text-white/90">
-                      {event.environmentalData.airQuality.value}
+                      {environmentalData.airQuality.value}
                     </span>
                     <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">AQI</span>
                   </div>
                   <div className="mt-2 h-2 w-full bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
                     <div 
                       className={`h-full rounded-full ${
-                        event.environmentalData.airQuality.status === 'Good' ? 'bg-green-500' :
-                        event.environmentalData.airQuality.status === 'Moderate' ? 'bg-yellow-500' :
+                        environmentalData.airQuality.status === 'Good' ? 'bg-green-500' :
+                        environmentalData.airQuality.status === 'Moderate' ? 'bg-yellow-500' :
                         'bg-red-500'
                       }`} 
-                      style={{ width: `${Math.min(event.environmentalData.airQuality.value, 100)}%` }}
+                      style={{ width: `${Math.min(environmentalData.airQuality.value, 100)}%` }}
                     ></div>
                   </div>
                 </div>
               )}
               
               {/* Temperature */}
-              {event.environmentalData.temperature && (
+              {environmentalData.temperature && (
                 <div className="p-4 rounded-lg bg-gray-50 dark:bg-gray-800/50 border border-gray-100 dark:border-gray-800">
                   <div className="flex items-center justify-between mb-2">
                     <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">Temperature</h4>
                     <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                      event.environmentalData.temperature.status === 'Good' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
-                      event.environmentalData.temperature.status === 'Moderate' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' :
+                      environmentalData.temperature.status === 'Good' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
+                      environmentalData.temperature.status === 'Moderate' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' :
                       'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
                     }`}>
-                      {event.environmentalData.temperature.status}
+                      {environmentalData.temperature.status}
                     </span>
                   </div>
                   <div className="flex items-end">
                     <span className="text-2xl font-bold text-gray-800 dark:text-white/90">
-                      {event.environmentalData.temperature.value}°{event.environmentalData.temperature.unit}
+                      {environmentalData.temperature.value}°{environmentalData.temperature.unit}
                     </span>
                     <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">Current</span>
                   </div>
@@ -535,40 +561,40 @@ export default function EventDetailsPage() {
               )}
               
               {/* Noise Level */}
-              {event.environmentalData.noise && (
+              {environmentalData.noise && (
                 <div className="p-4 rounded-lg bg-gray-50 dark:bg-gray-800/50 border border-gray-100 dark:border-gray-800">
                   <div className="flex items-center justify-between mb-2">
                     <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">Noise Level</h4>
                     <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                      event.environmentalData.noise.status === 'Low' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
-                      event.environmentalData.noise.status === 'Moderate' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' :
+                      environmentalData.noise.status === 'Low' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
+                      environmentalData.noise.status === 'Moderate' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' :
                       'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
                     }`}>
-                      {event.environmentalData.noise.status}
+                      {environmentalData.noise.status}
                     </span>
                   </div>
                   <div className="flex items-end">
                     <span className="text-2xl font-bold text-gray-800 dark:text-white/90">
-                      {event.environmentalData.noise.value} {event.environmentalData.noise.unit}
+                      {environmentalData.noise.value} {environmentalData.noise.unit}
                     </span>
                   </div>
                   <div className="mt-2 h-2 w-full bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
                     <div 
                       className={`h-full rounded-full ${
-                        event.environmentalData.noise.status === 'Low' ? 'bg-green-500' :
-                        event.environmentalData.noise.status === 'Moderate' ? 'bg-yellow-500' :
+                        environmentalData.noise.status === 'Low' ? 'bg-green-500' :
+                        environmentalData.noise.status === 'Moderate' ? 'bg-yellow-500' :
                         'bg-red-500'
                       }`} 
-                      style={{ width: `${Math.min((event.environmentalData.noise.value / 120) * 100, 100)}%` }}
+                      style={{ width: `${Math.min((environmentalData.noise.value / 120) * 100, 100)}%` }}
                     ></div>
                   </div>
                 </div>
               )}
               
               {/* Last Updated */}
-              {event.environmentalData.lastUpdated && (
+              {environmentalData.lastUpdated && (
                 <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Last updated: {new Date(event.environmentalData.lastUpdated).toLocaleString()}
+                  Last updated: {new Date(environmentalData.lastUpdated).toLocaleString()}
                 </p>
               )}
             </div>
@@ -584,17 +610,53 @@ export default function EventDetailsPage() {
             </div>
           )}
           
+          {/* Event Stats */}
+          <div className="mt-8 p-4 rounded-lg bg-gray-50 dark:bg-gray-800/50 border border-gray-100 dark:border-gray-800">
+            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Event Stats</h3>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-gray-500 dark:text-gray-400">Chat Messages</span>
+                <span className="font-medium text-gray-800 dark:text-white">{event.chatMessageCount}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-gray-500 dark:text-gray-400">Forums</span>
+                <span className="font-medium text-gray-800 dark:text-white">{event.forums?.length || 0}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-gray-500 dark:text-gray-400">Visibility</span>
+                <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                  event.isPublic 
+                    ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' 
+                    : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400'
+                }`}>
+                  {event.isPublic ? 'Public' : 'Private'}
+                </span>
+              </div>
+            </div>
+          </div>
+          
           {/* Event Actions */}
           <div className="mt-8">
             <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 mb-3">Admin Actions</h3>
             <div className="space-y-2">
               <button 
-                className="flex items-center justify-center w-full px-4 py-2 text-sm font-medium transition rounded-lg border border-red-200 text-red-600 hover:bg-red-50 dark:border-red-900/30 dark:text-red-400 dark:hover:bg-red-900/20"
+                onClick={handleDeleteEvent}
+                disabled={isDeleting}
+                className="flex items-center justify-center w-full px-4 py-2 text-sm font-medium transition rounded-lg border border-red-200 text-red-600 hover:bg-red-50 dark:border-red-900/30 dark:text-red-400 dark:hover:bg-red-900/20 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" className="mr-2 h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
-                </svg>
-                Delete Event
+                {isDeleting ? (
+                  <>
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-red-200 border-t-red-600 mr-2"></div>
+                    Deleting...
+                  </>
+                ) : (
+                  <>
+                    <svg xmlns="http://www.w3.org/2000/svg" className="mr-2 h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                    </svg>
+                    Delete Event
+                  </>
+                )}
               </button>
             </div>
           </div>
@@ -626,7 +688,7 @@ export default function EventDetailsPage() {
                   type="text"
                   id="title"
                   name="title"
-                  value={editForm.title}
+                  value={editForm.title || ''}
                   onChange={handleChange}
                   required
                   className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-gray-700 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300"
@@ -640,7 +702,7 @@ export default function EventDetailsPage() {
                 <textarea
                   id="description"
                   name="description"
-                  value={editForm.description}
+                  value={editForm.description || ''}
                   onChange={handleChange}
                   required
                   rows={4}
@@ -649,22 +711,22 @@ export default function EventDetailsPage() {
               </div>
               
               <div>
-                <label htmlFor="category" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                <label htmlFor="categoryId" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Category
                 </label>
                 <select
-                  id="category"
-                  name="category"
-                  value={editForm.category}
+                  id="categoryId"
+                  name="categoryId"
+                  value={editForm.categoryId || ''}
                   onChange={handleChange}
                   required
                   className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-gray-700 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300"
                 >
-                  <option value="Music">Music</option>
-                  <option value="Technology">Technology</option>
-                  <option value="Food">Food</option>
-                  <option value="Art">Art</option>
-                  <option value="Sports">Sports</option>
+                  {categories.map(category => (
+                    <option key={category.categoryId} value={category.categoryId}>
+                      {category.categoryName}
+                    </option>
+                  ))}
                 </select>
               </div>
 
@@ -677,7 +739,7 @@ export default function EventDetailsPage() {
                     type="date"
                     id="date"
                     name="date"
-                    value={editForm.date}
+                    value={editForm.date || ''}
                     onChange={handleChange}
                     required
                     className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-gray-700 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300"
@@ -692,7 +754,7 @@ export default function EventDetailsPage() {
                     type="time"
                     id="time"
                     name="time"
-                    value={editForm.time}
+                    value={editForm.time || ''}
                     onChange={handleChange}
                     required
                     className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-gray-700 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300"
@@ -724,7 +786,7 @@ export default function EventDetailsPage() {
                     type="text"
                     id="locationName"
                     name="location.name"
-                    value={editForm.location.name || ''}
+                    value={editForm.location?.name || ''}
                     onChange={handleChange}
                     className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-gray-700 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300"
                   />
@@ -738,7 +800,7 @@ export default function EventDetailsPage() {
                     type="text"
                     id="lat"
                     name="location.lat"
-                    value={editForm.location.lat}
+                    value={editForm.location?.lat || ''}
                     onChange={handleChange}
                     required
                     className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-gray-700 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300"
@@ -753,7 +815,7 @@ export default function EventDetailsPage() {
                     type="text"
                     id="lng"
                     name="location.lng"
-                    value={editForm.location.lng}
+                    value={editForm.location?.lng || ''}
                     onChange={handleChange}
                     required
                     className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-gray-700 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300"
@@ -768,7 +830,7 @@ export default function EventDetailsPage() {
                 </label>
                 <div className="mt-1 flex justify-between items-center">
                   <span className="text-xs text-gray-500 dark:text-gray-400">
-                    {editForm.images?.length || 0} image(s) available
+                    {eventImages.length} image(s) available
                   </span>
                   <button
                     type="button"
@@ -820,7 +882,7 @@ export default function EventDetailsPage() {
           <div className="bg-white dark:bg-gray-800 rounded-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6 m-4">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-lg font-medium text-gray-800 dark:text-white">
-                {event.environmentalData ? 'Edit Environmental Data' : 'Add Environmental Data'}
+                {environmentalData ? 'Edit Environmental Data' : 'Add Environmental Data'}
               </h2>
               <button 
                 onClick={() => setIsEnvDataModalOpen(false)}
@@ -842,26 +904,16 @@ export default function EventDetailsPage() {
                 </div>
               )}
 
-              {/* Prepare the environmentalData object structure if it doesn't exist */}
-              {!editForm.environmentalData && (
-                <script
-                  dangerouslySetInnerHTML={{
-                    __html: `
-                      document.addEventListener('DOMContentLoaded', function() {
-                        ${JSON.stringify({
-                          ...editForm,
-                          environmentalData: {
-                            airQuality: { value: '', status: 'Good' },
-                            temperature: { value: '', unit: 'C', status: 'Good' },
-                            noise: { value: '', unit: 'dB', status: 'Low' },
-                            lastUpdated: new Date().toISOString()
-                          }
-                        })}
-                      });
-                    `
-                  }}
-                />
-              )}
+              {/* Initialize environmental data if it doesn't exist */}
+              {!editForm.environmentalData && setEditForm(prev => ({
+                ...prev,
+                environmentalData: {
+                  airQuality: { value: 50, status: 'Good' },
+                  temperature: { value: 25, unit: 'C', status: 'Good' },
+                  noise: { value: 60, unit: 'dB', status: 'Low' },
+                  lastUpdated: new Date().toISOString()
+                }
+              }))}
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
@@ -1034,11 +1086,11 @@ export default function EventDetailsPage() {
 
             <form onSubmit={handleImageSubmit} className="space-y-4">
               {/* Current Images */}
-              {editForm.images && editForm.images.length > 0 && (
+              {eventImages && eventImages.length > 0 && (
                 <div>
                   <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Current Images</h3>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                    {editForm.images.map((image: string, index: number) => (
+                    {eventImages.map((image, index) => (
                       <div key={index} className="relative group">
                         <div className="aspect-video w-full rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700">
                           <Image 

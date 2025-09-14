@@ -6,6 +6,9 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { GoogleMap, Marker } from '@react-google-maps/api';
 import { useGoogleMaps } from '@/context/GoogleMapsContext';
+import { getEvents, getEventById, updateEvent, deleteEvent } from '@/lib/api/events';
+import { getEventCategories } from '@/lib/api/eventCategories';
+import { EventDto, EventDetailDto, EventCategoryDto, UpdateEventCommand } from '@/lib/api/types';
 
 // Define the environmental data type
 interface EnvironmentalData {
@@ -17,133 +20,20 @@ interface EnvironmentalData {
   description?: string;
 }
 
-// Define the event data type
-interface EventData {
-  id: string;
-  title: string;
-  description: string;
-  date: string;
-  time: string;
-  category: string;
+// Extended event data for UI (with additional fields for images and environmental data)
+interface ExtendedEventData extends EventDto {
+  environmentalData?: EnvironmentalData[];
+  images?: string[];
   location: {
     name?: string;
     lat: number;
     lng: number;
   };
-  status: string;
-  organizer: string;
+  date: string;
+  time: string;
   hasEnvironmentalData: boolean;
-  environmentalData?: EnvironmentalData[];
-  images?: string[];
+  organizer: string;
 }
-
-// Sample environmental data
-const sampleEnvironmentalData: EnvironmentalData[] = [
-  {
-    id: 'env1',
-    type: 'Air Quality',
-    value: 35,
-    unit: 'AQI',
-    timestamp: '2025-07-15T14:00:00',
-    description: 'Measured at event site entrance'
-  },
-  {
-    id: 'env2',
-    type: 'Noise Level',
-    value: 75,
-    unit: 'dB',
-    timestamp: '2025-07-15T16:00:00',
-    description: 'Measured at main stage'
-  }
-];
-
-// Sample events data
-const sampleEvents: EventData[] = [
-  {
-    id: '1',
-    title: 'Summer Music Festival',
-    description: 'Annual music festival featuring local and international artists',
-    date: '2025-07-15',
-    time: '14:00',
-    category: 'Music',
-    location: { lat: 35.7219, lng: 51.3347, name: 'City Park' },
-    status: 'Active',
-    organizer: 'John Smith',
-    hasEnvironmentalData: true,
-    environmentalData: sampleEnvironmentalData,
-    images: [
-      '/images/event/event-01.jpg',
-      '/images/event/event-02.jpg',
-      '/images/event/event-03.jpg',
-    ]
-  },
-  {
-    id: '2',
-    title: 'Tech Conference 2025',
-    description: 'The biggest tech conference of the year',
-    date: '2025-08-10',
-    time: '09:00',
-    category: 'Technology',
-    location: { lat: 35.7246, lng: 51.3853 },
-    status: 'Active',
-    organizer: 'Sarah Johnson',
-    hasEnvironmentalData: false,
-    images: [
-      '/images/event/event-04.jpg',
-    ]
-  },
-  {
-    id: '3',
-    title: 'Food & Wine Festival',
-    description: 'Taste the best local cuisine and wines',
-    date: '2025-09-05',
-    time: '12:00',
-    category: 'Food',
-    location: { lat: 35.7007, lng: 51.3947, name: 'Downtown Square' },
-    status: 'Pending',
-    organizer: 'Mike Williams',
-    hasEnvironmentalData: false,
-    images: []
-  },
-  {
-    id: '4',
-    title: 'Art Exhibition',
-    description: 'Featuring works from contemporary local artists',
-    date: '2025-07-25',
-    time: '10:00',
-    category: 'Art',
-    location: { lat: 35.7137, lng: 51.3898, name: 'Modern Gallery' },
-    status: 'Active',
-    organizer: 'Emma Davis',
-    hasEnvironmentalData: true,
-    environmentalData: [
-      {
-        id: 'env3',
-        type: 'Temperature',
-        value: 22,
-        unit: '°C',
-        timestamp: '2025-07-25T10:00:00',
-        description: 'Gallery ambient temperature'
-      }
-    ],
-    images: [
-      '/images/event/event-05.jpg',
-    ]
-  },
-  {
-    id: '5',
-    title: 'Charity Marathon',
-    description: 'Annual charity run to support local causes',
-    date: '2025-08-30',
-    time: '07:00',
-    category: 'Sports',
-    location: { lat: 35.7437, lng: 51.3587, name: 'City Stadium' },
-    status: 'Pending',
-    organizer: 'David Brown',
-    hasEnvironmentalData: false,
-    images: []
-  },
-];
 
 // Map component
 const MapComponent = ({ 
@@ -172,6 +62,7 @@ const MapComponent = ({
     }
   };
 
+  
   return isLoaded ? (
     <GoogleMap
       mapContainerStyle={{
@@ -195,45 +86,126 @@ const MapComponent = ({
 
 export default function ManageEvents() {
   const router = useRouter();
-  const [events, setEvents] = useState<EventData[]>(sampleEvents);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [events, setEvents] = useState<ExtendedEventData[]>([]);
   const [selectedCategory, setSelectedCategory] = useState('All Categories');
   const [selectedStatus, setSelectedStatus] = useState('All Status');
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isImagesModalOpen, setIsImagesModalOpen] = useState(false);
   const [isEnvDataModalOpen, setIsEnvDataModalOpen] = useState(false);
-  const [editingEvent, setEditingEvent] = useState<EventData | null>(null);
+  const [editingEvent, setEditingEvent] = useState<ExtendedEventData | null>(null);
   const [editingEnvData, setEditingEnvData] = useState<EnvironmentalData | null>(null);
   const [newImageFiles, setNewImageFiles] = useState<File[]>([]);
+  const [categories, setCategories] = useState<EventCategoryDto[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [startDate, setStartDate] = useState<string>('');
+const [startTime, setStartTime] = useState<string>('');
+const [endDate, setEndDate] = useState<string>('');
+const [endTime, setEndTime] = useState<string>('');
+const [imageUrls, setImageUrls] = useState<string[]>([]);
+const [removedImageIndexes, setRemovedImageIndexes] = useState<number[]>([]);
   
-  // Filter events based on search term, category, and status
+  // Fetch events and categories on component mount
+  useEffect(() => {
+    const fetchData = async () => {
+      setIsLoading(true);
+      setError(null);
+      
+      try {
+        // Fetch categories first
+        const categoriesData = await getEventCategories();
+        setCategories(categoriesData);
+        
+        // Then fetch all events (including private ones for admin)
+        const eventsData = await getEvents(true);
+        
+        // Transform events to include UI-specific fields
+        const transformedEvents: ExtendedEventData[] = eventsData.map(event => ({
+          ...event,
+          location: {
+            name: 'Event Location', // Default location name
+            lat: event.latitude,
+            lng: event.longitude,
+          },
+          date: new Date(event.startDateTime).toISOString().split('T')[0],
+          time: new Date(event.startDateTime).toTimeString().substring(0, 5),
+          hasEnvironmentalData: false, // We don't have this info from API
+          environmentalData: [],
+          images: [],
+          organizer: event.creatorName || 'Unknown',
+        }));
+        
+        setEvents(transformedEvents);
+      } catch (err) {
+        console.error('Error fetching data:', err);
+        setError('Failed to load events or categories. Please try again.');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchData();
+  }, []);
+  
+  // Filter events based on category and status
   const filteredEvents = events.filter(event => {
-    const matchesSearch = event.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          event.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          event.organizer.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesCategory = selectedCategory === 'All Categories' || event.categoryName === selectedCategory;
     
-    const matchesCategory = selectedCategory === 'All Categories' || event.category === selectedCategory;
+    // For status filtering, map our status values to the API's boolean fields
+    let statusMatch = true;
+    if (selectedStatus === 'Active') {
+      statusMatch = true; // All events are considered active for now
+    } else if (selectedStatus === 'Pending') {
+      statusMatch = false; // We don't have a pending status in the API
+    } else if (selectedStatus === 'Cancelled') {
+      statusMatch = false; // We don't have a cancelled status in the API
+    }
     
-    const matchesStatus = selectedStatus === 'All Status' || event.status === selectedStatus;
-    
-    return matchesSearch && matchesCategory && matchesStatus;
+    return matchesCategory && statusMatch;
   });
   
   // Delete event
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (window.confirm('Are you sure you want to delete this event?')) {
-      setEvents(events.filter(event => event.id !== id));
+      try {
+        await deleteEvent(id);
+        setEvents(events.filter(event => event.eventId !== id));
+      } catch (err) {
+        console.error('Error deleting event:', err);
+        alert('Failed to delete event. Please try again.');
+      }
     }
   };
 
-  // Open edit modal
-  const handleEdit = (event: EventData) => {
+const handleEdit = async (event: ExtendedEventData) => {
+  try {
     setEditingEvent({...event});
-    setIsEditModalOpen(true);
+    
+    // Set date and time fields
+    const startDateTime = new Date(event.startDateTime);
+    const endDateTime = new Date(event.endDateTime);
+    
+    setStartDate(startDateTime.toISOString().split('T')[0]);
+    setStartTime(startDateTime.toTimeString().substring(0, 5));
+    setEndDate(endDateTime.toISOString().split('T')[0]);
+    setEndTime(endDateTime.toTimeString().substring(0, 5));
+    
+    // Initialize image URLs if available
+    if (event.images && event.images.length > 0) {
+      setImageUrls(event.images);
+    } else {
+      setImageUrls([]);
+    }
+    
     setNewImageFiles([]);
-  };
-
+    setRemovedImageIndexes([]);
+    setIsEditModalOpen(true);
+  } catch (err) {
+    console.error('Error setting up event editing:', err);
+    alert('Failed to load event details. Please try again.');
+  }
+};
   // Handle form field changes
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -268,28 +240,60 @@ export default function ManageEvents() {
         ...editingEvent.location,
         lat,
         lng
-      }
+      },
+      latitude: lat,
+      longitude: lng
     });
   };
 
-  // Submit edited event
-  const handleEditSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!editingEvent) return;
-    
-    // Update the event with new data
-    setEvents(events.map(event => {
-      if (event.id === editingEvent.id) {
-        return editingEvent;
-      }
-      return event;
-    }));
-    
-    setIsEditModalOpen(false);
-    setEditingEvent(null);
-  };
+const handleEditSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+  if (!editingEvent) return;
 
+  try {
+    // Create start and end date-times by combining date and time
+    const startDateTime = new Date(`${startDate}T${startTime}`);
+    const endDateTime = new Date(`${endDate}T${endTime}`);
+
+    // Create the update command
+    const updateCommand: UpdateEventCommand = {
+      id: editingEvent.id,
+      title: editingEvent.title,
+      description: editingEvent.description,
+      location: editingEvent.location,
+      latitude: editingEvent.latitude,
+      longitude: editingEvent.longitude,
+      startDateTime: startDateTime.toISOString(),
+      endDateTime: endDateTime.toISOString(),
+      eventCategoryId: editingEvent.eventCategoryId,
+      environmentalData: {
+        carbonFootprint: editingEvent.environmentalData?.carbonFootprint || 0,
+        renewableEnergyUse: editingEvent.environmentalData?.renewableEnergyUse || 0,
+        wasteReduction: editingEvent.environmentalData?.wasteReduction || 0
+      }
+      // Note: We don't send images to the backend as you mentioned the backend doesn't have an image attribute
+    };
+
+    await updateEvent(updateCommand);
+    
+    // Handle image uploads if needed (client-side only)
+    // You might want to add your own logic to store these images somewhere
+    
+    // Close modal and refresh data
+    setIsEditModalOpen(false);
+    fetchEvents();
+    
+    // Reset state
+    setEditingEvent(null);
+    setNewImageFiles([]);
+    setImageUrls([]);
+    setRemovedImageIndexes([]);
+    
+  } catch (err) {
+    console.error('Error updating event:', err);
+    alert('Failed to update event. Please try again.');
+  }
+};
   // Handle file upload
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -413,10 +417,54 @@ export default function ManageEvents() {
     });
   };
   
-  // Available categories and status options
-  const categories = ['All Categories', 'Music', 'Technology', 'Food', 'Art', 'Sports'];
+  // Create category options array with "All Categories" at the beginning
+  const categoryOptions = ['All Categories', ...(categories.map(cat => cat.categoryName || '').filter(Boolean))];
+  
+  // Status options
   const statuses = ['All Status', 'Active', 'Pending', 'Cancelled'];
   const envDataTypes = ['Air Quality', 'Noise Level', 'Water Quality', 'Temperature', 'Humidity', 'Wind Speed', 'Other'];
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <>
+        <PageBreadCrumb title="Manage Events" page="Admin" />
+        <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
+          <div className="flex items-center justify-center p-12">
+            <div className="flex flex-col items-center">
+              <div className="h-12 w-12 animate-spin rounded-full border-4 border-gray-200 border-t-brand-500"></div>
+              <p className="mt-4 text-gray-600 dark:text-gray-400">Loading events...</p>
+            </div>
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <>
+        <PageBreadCrumb title="Manage Events" page="Admin" />
+        <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
+          <div className="flex items-center justify-center p-12">
+            <div className="flex flex-col items-center text-center">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 text-error-500" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+              </svg>
+              <p className="mt-4 text-error-500">{error}</p>
+              <button 
+                onClick={() => window.location.reload()}
+                className="mt-6 rounded-lg bg-brand-500 px-4 py-2 text-white hover:bg-brand-600"
+              >
+                Try Again
+              </button>
+            </div>
+          </div>
+        </div>
+      </>
+    );
+  }
 
   return (
     <>
@@ -444,33 +492,14 @@ export default function ManageEvents() {
         </div>
         
         {/* Filters */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <div>
-            <label htmlFor="search" className="sr-only">Search Events</label>
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                <svg className="w-4 h-4 text-gray-500 dark:text-gray-400" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 20">
-                  <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="m19 19-4-4m0-7A7 7 0 1 1 1 8a7 7 0 0 1 14 0Z"/>
-                </svg>
-              </div>
-              <input
-                type="search"
-                id="search"
-                className="block w-full p-2.5 pl-10 text-sm rounded-lg border border-gray-200 bg-white text-gray-700 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300"
-                placeholder="Search events..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
-          </div>
-          
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
           <div>
             <select
               value={selectedCategory}
               onChange={(e) => setSelectedCategory(e.target.value)}
               className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-gray-700 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300"
             >
-              {categories.map((category) => (
+              {categoryOptions.map((category) => (
                 <option key={category} value={category}>
                   {category}
                 </option>
@@ -514,7 +543,7 @@ export default function ManageEvents() {
                   Organizer
                 </th>
                 <th className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Env. Data
+                  Public
                 </th>
                 <th className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Images
@@ -526,7 +555,7 @@ export default function ManageEvents() {
             </thead>
             <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
               {filteredEvents.map(event => (
-                <tr key={event.id}>
+                <tr key={event.eventId}>
                   <td className="py-3 px-4 whitespace-nowrap">
                     <div className="flex items-center">
                       <div className="h-10 w-10 rounded-lg bg-gray-100 dark:bg-gray-800 flex items-center justify-center mr-3 overflow-hidden">
@@ -534,13 +563,13 @@ export default function ManageEvents() {
                           <div className="relative h-full w-full">
                             <Image
                               src={event.images[0]}
-                              alt={event.title}
+                              alt={event.title || ''}
                               fill
                               className="object-cover"
                             />
                           </div>
                         ) : (
-                          <span className="text-xs font-medium">{event.title.charAt(0)}</span>
+                          <span className="text-xs font-medium">{event.title?.charAt(0) || '?'}</span>
                         )}
                       </div>
                       <div className="flex flex-col">
@@ -553,37 +582,34 @@ export default function ManageEvents() {
                   </td>
                   <td className="py-3 px-4 whitespace-nowrap text-gray-600 dark:text-gray-300">
                     <div className="flex flex-col">
-                      <span>{new Date(event.date).toLocaleDateString()}</span>
-                      <span className="text-xs text-gray-500 dark:text-gray-400">{event.time}</span>
+                     <span>{new Date(event.startDateTime).toLocaleDateString()}</span>
+                      <span className="text-xs text-gray-500 dark:text-gray-400">
+                        {new Date(event.startDateTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                      </span>
                     </div>
                   </td>
                   <td className="py-3 px-4 whitespace-nowrap">
                     <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                      event.category === 'Music' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
-                      event.category === 'Technology' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' :
-                      event.category === 'Food' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
-                      event.category === 'Art' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' :
-                      event.category === 'Sports' ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' :
+                      event.categoryName === 'Music' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
+                      event.categoryName === 'Technology' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' :
+                      event.categoryName === 'Food' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
+                      event.categoryName === 'Art' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' :
+                      event.categoryName === 'Sports' ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' :
                       'bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400'
                     }`}>
-                      {event.category}
+                      {event.categoryName || 'Uncategorized'}
                     </span>
                   </td>
                   <td className="py-3 px-4 whitespace-nowrap">
-                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                      event.status === 'Active' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
-                      event.status === 'Pending' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' :
-                      event.status === 'Cancelled' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
-                      'bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400'
-                    }`}>
-                      {event.status}
+                    <span className="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                      Active
                     </span>
                   </td>
                   <td className="py-3 px-4 whitespace-nowrap text-gray-600 dark:text-gray-300">
-                    {event.organizer}
+                    {event.creatorName || 'Unknown'}
                   </td>
                   <td className="py-3 px-4 whitespace-nowrap">
-                    {event.hasEnvironmentalData ? (
+                    {event.isPublic ? (
                       <span className="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
                         Yes
                       </span>
@@ -621,7 +647,7 @@ export default function ManageEvents() {
                   <td className="py-3 px-4 whitespace-nowrap text-right">
                     <div className="flex justify-end space-x-2">
                       <Link 
-                        href={`/events/${event.id}`}
+                        href={`/events/${event.eventId}`}
                         className="px-2 py-1 text-xs text-gray-600 bg-gray-100 rounded hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
                       >
                         View
@@ -633,7 +659,7 @@ export default function ManageEvents() {
                         Edit
                       </button>
                       <button
-                        onClick={() => handleDelete(event.id)}
+                        onClick={() => handleDelete(event.eventId)}
                         className="px-2 py-1 text-xs text-red-600 bg-red-50 rounded hover:bg-red-100 dark:bg-red-900/30 dark:text-red-400 dark:hover:bg-red-900/50"
                       >
                         Delete
@@ -652,7 +678,6 @@ export default function ManageEvents() {
             <p className="text-gray-500 dark:text-gray-400">No events found matching your filters.</p>
             <button
               onClick={() => {
-                setSearchTerm('');
                 setSelectedCategory('All Categories');
                 setSelectedStatus('All Status');
               }}
@@ -663,357 +688,434 @@ export default function ManageEvents() {
           </div>
         )}
         
-        {/* Pagination */}
+        {/* Pagination - simplified since we're loading all events at once */}
         <div className="flex justify-between items-center mt-6">
           <p className="text-sm text-gray-500 dark:text-gray-400">
             Showing <span className="font-medium">{filteredEvents.length}</span> of <span className="font-medium">{events.length}</span> events
           </p>
-          
-          <div className="flex space-x-1">
-            <button className="px-3 py-1 text-sm text-gray-600 bg-gray-100 rounded hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700">
-              Previous
-            </button>
-            <button className="px-3 py-1 text-sm text-white bg-brand-500 rounded hover:bg-brand-600">
-              1
-            </button>
-            <button className="px-3 py-1 text-sm text-gray-600 bg-gray-100 rounded hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700">
-              2
-            </button>
-            <button className="px-3 py-1 text-sm text-gray-600 bg-gray-100 rounded hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700">
-              Next
-            </button>
-          </div>
         </div>
       </div>
       
       {/* Edit Event Modal */}
-      {isEditModalOpen && editingEvent && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 overflow-y-auto">
-          <div className="bg-white dark:bg-gray-800 rounded-lg w-full max-w-3xl max-h-[90vh] overflow-y-auto p-6 m-4">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-medium text-gray-800 dark:text-white">Edit Event</h2>
-              <button 
-                onClick={() => setIsEditModalOpen(false)}
-                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                </svg>
-              </button>
-            </div>
+{/* Edit Event Modal */}
+{isEditModalOpen && editingEvent && (
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 overflow-y-auto">
+    <div className="bg-white dark:bg-gray-800 rounded-lg w-full max-w-3xl max-h-[90vh] overflow-y-auto p-6 m-4">
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-lg font-medium text-gray-800 dark:text-white">Edit Event</h2>
+        <button 
+          onClick={() => setIsEditModalOpen(false)}
+          className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+          </svg>
+        </button>
+      </div>
 
-            <form onSubmit={handleEditSubmit} className="space-y-4">
-              <div>
-                <label htmlFor="title" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Event Title
-                </label>
-                <input
-                  type="text"
-                  id="title"
-                  name="title"
-                  value={editingEvent.title}
-                  onChange={handleChange}
-                  required
-                  className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-gray-700 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300"
-                />
-              </div>
+      <form onSubmit={handleEditSubmit} className="space-y-4">
+        <div>
+          <label htmlFor="title" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            Event Title
+          </label>
+          <input
+            type="text"
+            id="title"
+            name="title"
+            value={editingEvent.title || ''}
+            onChange={handleChange}
+            required
+            className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-gray-700 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300"
+          />
+        </div>
 
-              <div>
-                <label htmlFor="description" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Description
-                </label>
-                <textarea
-                  id="description"
-                  name="description"
-                  value={editingEvent.description}
-                  onChange={handleChange}
-                  required
-                  rows={3}
-                  className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-gray-700 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300"
-                ></textarea>
-              </div>
-              
-              {/* Image Management */}
-              <div>
-                <div className="flex justify-between items-center mb-1">
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Event Images
-                  </label>
+        <div>
+          <label htmlFor="description" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            Description
+          </label>
+          <textarea
+            id="description"
+            name="description"
+            value={editingEvent.description || ''}
+            onChange={handleChange}
+            required
+            rows={3}
+            className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-gray-700 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300"
+          ></textarea>
+        </div>
+        
+        {/* Image Management - Updated to handle 3 images directly in the edit modal */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            Event Images (Up to 3)
+          </label>
+          
+          {/* Display existing images with remove option */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+            {imageUrls.map((url, index) => (
+              !removedImageIndexes.includes(index) && (
+                <div key={index} className="relative">
+                  <img 
+                    src={url} 
+                    alt={`Event image ${index + 1}`} 
+                    className="w-full h-40 object-cover rounded-lg border border-gray-200 dark:border-gray-700"
+                  />
                   <button
                     type="button"
-                    onClick={() => setIsImagesModalOpen(true)}
-                    className="text-xs px-2 py-1 bg-brand-50 text-brand-600 rounded hover:bg-brand-100 dark:bg-brand-900/30 dark:text-brand-400 dark:hover:bg-brand-900/50"
+                    className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1"
+                    onClick={() => setRemovedImageIndexes([...removedImageIndexes, index])}
                   >
-                    Manage Images
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                    </svg>
                   </button>
                 </div>
-                
-                <div className="flex flex-wrap gap-2 mt-2">
-                  {editingEvent.images && editingEvent.images.length > 0 ? (
-                    editingEvent.images.map((img, idx) => (
-                      <div key={idx} className="relative h-16 w-16 rounded overflow-hidden">
-                        <Image
-                          src={img}
-                          alt={`Event thumbnail ${idx + 1}`}
-                          fill
-                          className="object-cover"
-                        />
-                      </div>
-                    ))
-                  ) : (
-                    <div className="text-sm text-gray-500 dark:text-gray-400 italic">
-                      No images uploaded
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label htmlFor="category" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Category
-                  </label>
-                  <select
-                    id="category"
-                    name="category"
-                    value={editingEvent.category}
-                    onChange={handleChange}
-                    required
-                    className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-gray-700 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300"
-                  >
-                    <option value="Music">Music</option>
-                    <option value="Technology">Technology</option>
-                    <option value="Food">Food</option>
-                    <option value="Art">Art</option>
-                    <option value="Sports">Sports</option>
-                  </select>
-                </div>
-                
-                <div>
-                  <label htmlFor="status" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Status
-                  </label>
-                  <select
-                    id="status"
-                    name="status"
-                    value={editingEvent.status}
-                    onChange={handleChange}
-                    required
-                    className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-gray-700 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300"
-                  >
-                    <option value="Active">Active</option>
-                    <option value="Pending">Pending</option>
-                    <option value="Cancelled">Cancelled</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label htmlFor="date" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Date
-                  </label>
-                  <input
-                    type="date"
-                    id="date"
-                    name="date"
-                    value={editingEvent.date}
-                    onChange={handleChange}
-                    required
-                    className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-gray-700 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300"
-                  />
-                </div>
-                
-                <div>
-                  <label htmlFor="time" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Time
-                  </label>
-                  <input
-                    type="time"
-                    id="time"
-                    name="time"
-                    value={editingEvent.time}
-                    onChange={handleChange}
-                    required
-                    className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-gray-700 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label htmlFor="organizer" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Organizer
-                </label>
-                <input
-                  type="text"
-                  id="organizer"
-                  name="organizer"
-                  value={editingEvent.organizer}
-                  onChange={handleChange}
-                  required
-                  className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-gray-700 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300"
+              )
+            ))}
+            
+            {/* New Image Previews */}
+            {newImageFiles.map((file, index) => (
+              <div key={`new-${index}`} className="relative">
+                <img 
+                  src={URL.createObjectURL(file)} 
+                  alt={`New event image ${index + 1}`} 
+                  className="w-full h-40 object-cover rounded-lg border border-gray-200 dark:border-gray-700"
                 />
-              </div>
-
-              {/* Location Selection with Map */}
-              <div>
-                <div className="flex justify-between items-center mb-1">
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Location
-                  </label>
-                  <span className="text-xs text-gray-500 dark:text-gray-400">
-                    Click on the map to set location
-                  </span>
-                </div>
-                
-                <div className="mb-3 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700">
-                  <MapComponent 
-                    location={editingEvent.location} 
-                    onLocationChange={handleLocationChange} 
-                  />
-                </div>
-                
-                <div className="grid grid-cols-3 gap-4">
-                  <div>
-                    <label htmlFor="locationName" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Location Name
-                    </label>
-                    <input
-                      type="text"
-                      id="locationName"
-                      name="location.name"
-                      value={editingEvent.location.name || ''}
-                      onChange={handleChange}
-                      className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-gray-700 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300"
-                    />
-                  </div>
-                  
-                  <div>
-                    <label htmlFor="latitude" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Latitude
-                    </label>
-                    <input
-                      type="number"
-                      step="any"
-                      id="latitude"
-                      name="location.lat"
-                      value={editingEvent.location.lat}
-                      onChange={handleChange}
-                      required
-                      className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-gray-700 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300"
-                    />
-                  </div>
-                  
-                  <div>
-                    <label htmlFor="longitude" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Longitude
-                    </label>
-                    <input
-                      type="number"
-                      step="any"
-                      id="longitude"
-                      name="location.lng"
-                      value={editingEvent.location.lng}
-                      onChange={handleChange}
-                      required
-                      className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-gray-700 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300"
-                    />
-                  </div>
-                </div>
-              </div>
-              
-              {/* Environmental Data */}
-              <div>
-                <div className="flex justify-between items-center mb-3">
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Environmental Data
-                  </label>
-                  <button
-                    type="button"
-                    onClick={handleAddEnvironmentalData}
-                    className="text-xs px-2 py-1 bg-brand-50 text-brand-600 rounded hover:bg-brand-100 dark:bg-brand-900/30 dark:text-brand-400 dark:hover:bg-brand-900/50"
-                  >
-                    Add Data Point
-                  </button>
-                </div>
-                
-                {editingEvent.environmentalData && editingEvent.environmentalData.length > 0 ? (
-                  <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
-                    <table className="w-full">
-                      <thead>
-                        <tr className="bg-gray-50 dark:bg-gray-900/50">
-                          <th className="py-2 px-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
-                          <th className="py-2 px-3 text-left text-xs font-medium text-gray-500 uppercase">Value</th>
-                          <th className="py-2 px-3 text-left text-xs font-medium text-gray-500 uppercase">Unit</th>
-                          <th className="py-2 px-3 text-left text-xs font-medium text-gray-500 uppercase">Timestamp</th>
-                          <th className="py-2 px-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                        {editingEvent.environmentalData.map(data => (
-                          <tr key={data.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
-                            <td className="py-2 px-3 text-sm text-gray-800 dark:text-gray-300">{data.type}</td>
-                            <td className="py-2 px-3 text-sm text-gray-800 dark:text-gray-300">{data.value}</td>
-                            <td className="py-2 px-3 text-sm text-gray-800 dark:text-gray-300">{data.unit}</td>
-                            <td className="py-2 px-3 text-sm text-gray-800 dark:text-gray-300">
-                              {new Date(data.timestamp).toLocaleString()}
-                            </td>
-                            <td className="py-2 px-3 text-right">
-                              <div className="flex justify-end space-x-2">
-                                <button
-                                  type="button"
-                                  onClick={() => handleEditEnvData(data)}
-                                  className="text-xs text-brand-600 hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300"
-                                >
-                                  Edit
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleDeleteEnvData(data.id)}
-                                  className="text-xs text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
-                                >
-                                  Delete
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <div className="text-center py-4 border border-dashed border-gray-200 dark:border-gray-700 rounded-lg">
-                    <p className="text-sm text-gray-500 dark:text-gray-400">No environmental data added yet.</p>
-                    <button
-                      type="button"
-                      onClick={handleAddEnvironmentalData}
-                      className="mt-2 text-sm text-brand-500 hover:text-brand-600"
-                    >
-                      Add data point
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              <div className="flex justify-end gap-3 pt-4">
                 <button
                   type="button"
-                  onClick={() => setIsEditModalOpen(false)}
-                  className="rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+                  className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1"
+                  onClick={() => {
+                    const updatedFiles = [...newImageFiles];
+                    updatedFiles.splice(index, 1);
+                    setNewImageFiles(updatedFiles);
+                  }}
                 >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-600 focus:outline-none"
-                >
-                  Save Changes
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                  </svg>
                 </button>
               </div>
-            </form>
+            ))}
+            
+            {/* Add Image Button (only show if less than 3 total images) */}
+            {(imageUrls.length - removedImageIndexes.length + newImageFiles.length) < 3 && (
+              <div 
+                onClick={() => fileInputRef.current?.click()}
+                className="h-40 flex items-center justify-center border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50"
+              >
+                <div className="text-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 mx-auto text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                  </svg>
+                  <span className="block mt-1 text-sm text-gray-500">Add Image</span>
+                </div>
+              </div>
+            )}
+          </div>
+          
+          <input
+            type="file"
+            accept="image/*"
+            className="hidden"
+            ref={fileInputRef}
+            onChange={(e) => {
+              const files = Array.from(e.target.files || []);
+              const totalImages = imageUrls.length - removedImageIndexes.length + newImageFiles.length;
+              
+              if (files.length + totalImages <= 3) {
+                setNewImageFiles([...newImageFiles, ...files]);
+              } else {
+                alert('You can only upload up to 3 images in total.');
+              }
+              
+              // Reset the input to allow selecting the same file again
+              if (e.target) e.target.value = '';
+            }}
+          />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label htmlFor="categoryId" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Category
+            </label>
+            <select
+              id="categoryId"
+              name="categoryId"
+              value={editingEvent.categoryId}
+              onChange={handleChange}
+              required
+              className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-gray-700 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300"
+            >
+              {categories.map((category) => (
+                <option key={category.categoryId} value={category.categoryId}>
+                  {category.categoryName}
+                </option>
+              ))}
+            </select>
+          </div>
+          
+          <div>
+            <label htmlFor="isPublic" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Visibility
+            </label>
+            <select
+              id="isPublic"
+              name="isPublic"
+              value={editingEvent.isPublic.toString()}
+              onChange={(e) => {
+                setEditingEvent({
+                  ...editingEvent,
+                  isPublic: e.target.value === 'true'
+                });
+              }}
+              required
+              className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-gray-700 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300"
+            >
+              <option value="true">Public</option>
+              <option value="false">Private</option>
+            </select>
           </div>
         </div>
-      )}
+
+        {/* Updated date/time fields with separate start/end date and time */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label htmlFor="startDate" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Start Date
+            </label>
+            <input
+              type="date"
+              id="startDate"
+              name="startDate"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              required
+              className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-gray-700 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300"
+            />
+          </div>
+          
+          <div>
+            <label htmlFor="startTime" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Start Time
+            </label>
+            <input
+              type="time"
+              id="startTime"
+              name="startTime"
+              value={startTime}
+              onChange={(e) => setStartTime(e.target.value)}
+              required
+              className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-gray-700 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300"
+            />
+          </div>
+          
+          <div>
+            <label htmlFor="endDate" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              End Date
+            </label>
+            <input
+              type="date"
+              id="endDate"
+              name="endDate"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              required
+              className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-gray-700 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300"
+            />
+          </div>
+          
+          <div>
+            <label htmlFor="endTime" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              End Time
+            </label>
+            <input
+              type="time"
+              id="endTime"
+              name="endTime"
+              value={endTime}
+              onChange={(e) => setEndTime(e.target.value)}
+              required
+              className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-gray-700 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label htmlFor="organizer" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            Organizer
+          </label>
+          <input
+            type="text"
+            id="organizer"
+            name="organizer"
+            value={editingEvent.organizer}
+            onChange={handleChange}
+            required
+            className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-gray-700 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300"
+            disabled
+          />
+        </div>
+
+        {/* Location Selection with Map */}
+        <div>
+          <div className="flex justify-between items-center mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              Location
+            </label>
+            <span className="text-xs text-gray-500 dark:text-gray-400">
+              Click on the map to set location
+            </span>
+          </div>
+          
+          <div className="mb-3 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700">
+            <MapComponent 
+              location={editingEvent.location} 
+              onLocationChange={handleLocationChange} 
+            />
+          </div>
+          
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <label htmlFor="locationName" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Location Name
+              </label>
+              <input
+                type="text"
+                id="locationName"
+                name="location.name"
+                value={editingEvent.location.name || ''}
+                onChange={handleChange}
+                className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-gray-700 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300"
+              />
+            </div>
+            
+            <div>
+              <label htmlFor="latitude" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Latitude
+              </label>
+              <input
+                type="number"
+                step="any"
+                id="latitude"
+                name="location.lat"
+                value={editingEvent.location.lat}
+                onChange={handleChange}
+                required
+                className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-gray-700 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300"
+              />
+            </div>
+            
+            <div>
+              <label htmlFor="longitude" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Longitude
+              </label>
+              <input
+                type="number"
+                step="any"
+                id="longitude"
+                name="location.lng"
+                value={editingEvent.location.lng}
+                onChange={handleChange}
+                required
+                className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-gray-700 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300"
+              />
+            </div>
+          </div>
+        </div>
+        
+        {/* Environmental Data */}
+        <div>
+          <div className="flex justify-between items-center mb-3">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              Environmental Data
+            </label>
+            <button
+              type="button"
+              onClick={handleAddEnvironmentalData}
+              className="text-xs px-2 py-1 bg-brand-50 text-brand-600 rounded hover:bg-brand-100 dark:bg-brand-900/30 dark:text-brand-400 dark:hover:bg-brand-900/50"
+            >
+              Add Data Point
+            </button>
+          </div>
+          
+          {editingEvent.environmentalData && editingEvent.environmentalData.length > 0 ? (
+            <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+              <table className="w-full">
+                <thead>
+                  <tr className="bg-gray-50 dark:bg-gray-900/50">
+                    <th className="py-2 px-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
+                    <th className="py-2 px-3 text-left text-xs font-medium text-gray-500 uppercase">Value</th>
+                    <th className="py-2 px-3 text-left text-xs font-medium text-gray-500 uppercase">Unit</th>
+                    <th className="py-2 px-3 text-left text-xs font-medium text-gray-500 uppercase">Timestamp</th>
+                    <th className="py-2 px-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                  {editingEvent.environmentalData.map(data => (
+                    <tr key={data.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                      <td className="py-2 px-3 text-sm text-gray-800 dark:text-gray-300">{data.type}</td>
+                      <td className="py-2 px-3 text-sm text-gray-800 dark:text-gray-300">{data.value}</td>
+                      <td className="py-2 px-3 text-sm text-gray-800 dark:text-gray-300">{data.unit}</td>
+                      <td className="py-2 px-3 text-sm text-gray-800 dark:text-gray-300">
+                        {new Date(data.timestamp).toLocaleString()}
+                      </td>
+                      <td className="py-2 px-3 text-right">
+                        <div className="flex justify-end space-x-2">
+                          <button
+                            type="button"
+                            onClick={() => handleEditEnvData(data)}
+                            className="text-xs text-brand-600 hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteEnvData(data.id)}
+                            className="text-xs text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="text-center py-4 border border-dashed border-gray-200 dark:border-gray-700 rounded-lg">
+              <p className="text-sm text-gray-500 dark:text-gray-400">No environmental data added yet.</p>
+              <button
+                type="button"
+                onClick={handleAddEnvironmentalData}
+                className="mt-2 text-sm text-brand-500 hover:text-brand-600"
+              >
+                Add data point
+              </button>
+            </div>
+          )}
+        </div>
+
+        <div className="flex justify-end gap-3 pt-4">
+          <button
+            type="button"
+            onClick={() => setIsEditModalOpen(false)}
+            className="rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            className="rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-600 focus:outline-none"
+          >
+            Save Changes
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+)}
       
       {/* Image Management Modal */}
       {isImagesModalOpen && editingEvent && (

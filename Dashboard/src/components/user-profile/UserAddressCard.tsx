@@ -1,18 +1,67 @@
 "use client";
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { useModal } from "../../hooks/useModal";
 import { Modal } from "../ui/modal";
 import Button from "../ui/button/Button";
 import Input from "../form/input/InputField";
 import Label from "../form/Label";
+import { useAuth } from "@/context/AuthContext";
 
 export default function UserAddressCard() {
   const { isOpen, openModal, closeModal } = useModal();
-  const handleSave = () => {
-    // Handle save logic here
-    console.log("Saving changes...");
-    closeModal();
+  const { user, loading, error: authError, updateUserProfile } = useAuth();
+
+  // Form state
+  const [formData, setFormData] = useState({
+    country: '',
+    city: '',
+    postalCode: '',
+    taxId: '',
+  });
+
+  // Update form data when user data is loaded
+  useEffect(() => {
+    if (user) {
+      setFormData({
+        country: user.country || '',
+        city: user.city || '',
+        postalCode: user.postalCode || '',
+        taxId: user.taxId || '',
+      });
+    }
+  }, [user]);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
   };
+
+  const handleSave = async () => {
+    try {
+      const success = await updateUserProfile(formData);
+      if (success) {
+        closeModal();
+      }
+    } catch (err) {
+      console.error("Error saving address:", err);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="p-5 border border-gray-200 rounded-2xl dark:border-gray-800 lg:p-6">
+        <div className="flex items-center justify-center py-10">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-gray-200 border-t-brand-500"></div>
+          <span className="ml-2 text-gray-500 dark:text-gray-400">Loading address information...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return null; // Don't show this component if user is not logged in
+  }
+
   return (
     <>
       <div className="p-5 border border-gray-200 rounded-2xl dark:border-gray-800 lg:p-6">
@@ -28,7 +77,7 @@ export default function UserAddressCard() {
                   Country
                 </p>
                 <p className="text-sm font-medium text-gray-800 dark:text-white/90">
-                  Iran
+                  {user.country || 'Not specified'}
                 </p>
               </div>
 
@@ -37,7 +86,7 @@ export default function UserAddressCard() {
                   City/State
                 </p>
                 <p className="text-sm font-medium text-gray-800 dark:text-white/90">
-                  Tehran.
+                  {user.city || 'Not specified'}
                 </p>
               </div>
 
@@ -46,7 +95,7 @@ export default function UserAddressCard() {
                   Postal Code
                 </p>
                 <p className="text-sm font-medium text-gray-800 dark:text-white/90">
-                  ERT 2489
+                  {user.postalCode || 'Not specified'}
                 </p>
               </div>
 
@@ -55,7 +104,7 @@ export default function UserAddressCard() {
                   TAX ID
                 </p>
                 <p className="text-sm font-medium text-gray-800 dark:text-white/90">
-                  AS4568384
+                  {user.taxId || 'Not specified'}
                 </p>
               </div>
             </div>
@@ -99,22 +148,42 @@ export default function UserAddressCard() {
               <div className="grid grid-cols-1 gap-x-6 gap-y-5 lg:grid-cols-2">
                 <div>
                   <Label>Country</Label>
-                  <Input type="text" defaultValue="Iran" />
+                  <Input 
+                    type="text" 
+                    name="country"
+                    value={formData.country}
+                    onChange={handleInputChange}
+                  />
                 </div>
 
                 <div>
                   <Label>City/State</Label>
-                  <Input type="text" defaultValue="Tehran" />
+                  <Input 
+                    type="text" 
+                    name="city"
+                    value={formData.city}
+                    onChange={handleInputChange}
+                  />
                 </div>
 
                 <div>
                   <Label>Postal Code</Label>
-                  <Input type="text" defaultValue="ERT 2489" />
+                  <Input 
+                    type="text" 
+                    name="postalCode"
+                    value={formData.postalCode}
+                    onChange={handleInputChange}
+                  />
                 </div>
 
                 <div>
                   <Label>TAX ID</Label>
-                  <Input type="text" defaultValue="AS4568384" />
+                  <Input 
+                    type="text" 
+                    name="taxId"
+                    value={formData.taxId}
+                    onChange={handleInputChange}
+                  />
                 </div>
               </div>
             </div>

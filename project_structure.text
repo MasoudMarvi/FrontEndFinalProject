@@ -185,6 +185,8 @@
         - admin-dashboard
           - environmental-data
             - page.tsx
+          - manage-categories
+            - page.tsx
           - manage-events
             - page.tsx
           - page.tsx
@@ -313,6 +315,7 @@
           - VideosExample.tsx
           - YouTubeEmbed.tsx
       - user-profile
+        - PasswordResetCard.tsx
         - UserAddressCard.tsx
         - UserInfoCard.tsx
         - UserMetaCard.tsx
@@ -322,6 +325,7 @@
         - SixteenIsToNine.tsx
         - TwentyOneIsToNine.tsx
     - context
+      - AuthContext.tsx
       - GoogleMapsContext.tsx
       - SidebarContext.tsx
       - ThemeContext.tsx
@@ -394,7 +398,17 @@
       - SidebarWidget.tsx
     - lib
       - api
+        -  auth.ts
+        - about.ts
+        - chatMessages.ts
+        - contactMessages.ts
+        - eventCategories.ts
+        - events.ts
+        - index.ts
+        - types.ts
+        - users.ts
       - axios.ts
       - login.ts
     - svg.d.ts
   - tsconfig.json
+- project_structure.text
