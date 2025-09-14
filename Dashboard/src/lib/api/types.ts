@@ -1,9 +1,17 @@
+// types.ts
 // Common API response types from Swagger documentation
 export interface AboutDto {
   title: string | null;
   content: string | null;
   createdAt: string;
   updatedAt: string | null;
+}
+
+// Define the EventStatus enum to match backend
+export enum EventStatus {
+  Pending = 0,
+  Active = 1,
+  Cancelled = 2
 }
 
 export interface ChatMessageDto {
@@ -33,6 +41,47 @@ export interface CreateContactMessageCommand {
   message: string | null;
 }
 
+// New EnvironmentalData types
+export interface EnvironmentalDataDto {
+  dataId: string;
+  latitude: number;
+  longitude: number;
+  airQualityIndex: number;
+  pollutionLevel: number;
+  temperature: number;
+  timestamp: string;
+  eventId: string;
+}
+
+export interface CreateEnvironmentalDataDto {
+  latitude: number;
+  longitude: number;
+  airQualityIndex: number;
+  pollutionLevel: number;
+  temperature: number;
+  timestamp: string;
+  eventId: string;
+}
+
+export interface UpdateEnvironmentalDataDto {
+  latitude: number;
+  longitude: number;
+  airQualityIndex: number;
+  pollutionLevel: number;
+  temperature: number;
+  timestamp: string;
+  eventId: string;
+}
+
+export interface CreateEnvironmentalDataCommand {
+  data: CreateEnvironmentalDataDto;
+}
+
+export interface UpdateEnvironmentalDataCommand {
+  dataId: string;
+  data: UpdateEnvironmentalDataDto;
+}
+
 export interface EventCategoryDto {
   categoryId: string;
   categoryName: string | null;
@@ -57,6 +106,7 @@ export interface ForumSummaryDto {
   messageCount: number;
 }
 
+// Updated EventDto with new fields
 export interface EventDto {
   eventId: string;
   title: string | null;
@@ -70,6 +120,10 @@ export interface EventDto {
   categoryName: string | null;
   creatorUserId: string | null;
   creatorName: string | null;
+  picture1: string | null;
+  picture2: string | null;
+  picture3: string | null;
+  status: EventStatus;
 }
 
 export interface EventDetailDto extends EventDto {
@@ -77,32 +131,25 @@ export interface EventDetailDto extends EventDto {
   chatMessageCount: number;
 }
 
-export interface CreateEventCommand {
-  title: string | null;
-  description: string | null;
+// Form data for multipart/form-data requests
+export interface EventFormData {
+  title: string;
+  description: string;
   latitude: number;
   longitude: number;
   startDateTime: string;
   endDateTime: string;
   isPublic: boolean;
   categoryId: string;
-}
-
-export interface UpdateEventCommand {
-  eventId: string;
-  title: string | null;
-  description: string | null;
-  latitude: number;
-  longitude: number;
-  startDateTime: string;
-  endDateTime: string;
-  isPublic: boolean;
-  categoryId: string;
+  picture1?: File;
+  picture2?: File;
+  picture3?: File;
+  status?: EventStatus;
 }
 
 export interface LoginCommand {
-  email: string ;
-  password: string ;
+  email: string;
+  password: string;
 }
 
 export interface RefreshTokenRequest {

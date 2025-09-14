@@ -11,7 +11,7 @@ import {
 import Badge from "../ui/badge/Badge";
 import Image from "next/image";
 import { getEvents } from "@/lib/api/events";
-import { EventDto } from "@/lib/api/types";
+import { EventDto, EventStatus } from "@/lib/api/types";
 
 // Define the TypeScript interface for our formatted event data
 interface FormattedEvent {
@@ -19,12 +19,49 @@ interface FormattedEvent {
   title: string;
   category: string;
   date: string;
-  status: "Upcoming" | "In Progress" | "Completed" | "Cancelled";
+  status: "Pending" | "Active" | "Cancelled";
+  statusCode: EventStatus;
   image: string;
 }
 
 // Placeholder image for events without images
 const DEFAULT_IMAGE = "/images/event/event-default.jpg";
+
+// Helper function to get the first available image from an event
+function getEventImage(event: EventDto): string {
+  if (event.picture1) return event.picture1;
+  if (event.picture2) return event.picture2;
+  if (event.picture3) return event.picture3;
+  return DEFAULT_IMAGE;
+}
+
+// Helper function to map EventStatus to display status
+function getStatusDisplay(status: EventStatus): "Pending" | "Active" | "Cancelled" {
+  switch (status) {
+    case EventStatus.Pending:
+      return "Pending";
+    case EventStatus.Active:
+      return "Active";
+    case EventStatus.Cancelled:
+      return "Cancelled";
+    default:
+      return "Pending";
+  }
+}
+
+// Helper function to map status to badge color
+function getStatusColor(status: EventStatus): "success" | "warning" | "info" | "error" {
+  switch (status) {
+    case EventStatus.Pending:
+      return "warning";
+    case EventStatus.Active:
+      return "success";
+    case EventStatus.Cancelled:
+      return "error";
+    default:
+      return "info";
+  }
+}
 
 export default function RecentEvents() {
   const [events, setEvents] = useState<FormattedEvent[]>([]);
@@ -41,20 +78,6 @@ export default function RecentEvents() {
         // Format the events data
         const formattedEvents: FormattedEvent[] = eventsData
           .map((event: EventDto) => {
-            // Calculate event status based on dates
-            const now = new Date();
-            const startDate = new Date(event.startDateTime);
-            const endDate = new Date(event.endDateTime);
-            
-            let status: "Upcoming" | "In Progress" | "Completed" | "Cancelled" = "Upcoming";
-            if (now < startDate) {
-              status = "Upcoming";
-            } else if (now >= startDate && now <= endDate) {
-              status = "In Progress";
-            } else if (now > endDate) {
-              status = "Completed";
-            }
-            
             return {
               id: event.eventId,
               title: event.title || "Untitled Event",
@@ -64,9 +87,10 @@ export default function RecentEvents() {
                 day: "numeric",
                 year: "numeric"
               }),
-              status,
-              // Use a placeholder image or an actual event image if available
-              image: DEFAULT_IMAGE // In a real implementation, you'd get this from your event data
+              status: getStatusDisplay(event.status),
+              statusCode: event.status,
+              // Use the first available image or default
+              image: getEventImage(event)
             };
           })
           // Sort by date (newest first)
@@ -236,6 +260,10 @@ export default function RecentEvents() {
                         src={event.image}
                         className="h-[50px] w-[50px] object-cover"
                         alt={event.title}
+                        onError={(e) => {
+                          // Fallback to default image if loading fails
+                          (e.target as HTMLImageElement).src = DEFAULT_IMAGE;
+                        }}
                       />
                     </div>
                     <div>
@@ -266,15 +294,7 @@ export default function RecentEvents() {
                 <TableCell className="py-3 text-gray-500 text-theme-sm dark:text-gray-400">
                   <Badge
                     size="sm"
-                    color={
-                      event.status === "Upcoming"
-                        ? "success"
-                        : event.status === "In Progress"
-                        ? "warning"
-                        : event.status === "Completed"
-                        ? "info"
-                        : "error"
-                    }
+                    color={getStatusColor(event.statusCode)}
                   >
                     {event.status}
                   </Badge>
