@@ -85,7 +85,6 @@ const MapComponent = ({
 };
 
 export default function ManageEvents() {
-  const router = useRouter();
   const [events, setEvents] = useState<ExtendedEventData[]>([]);
   const [selectedCategory, setSelectedCategory] = useState('All Categories');
   const [selectedStatus, setSelectedStatus] = useState('All Status');
@@ -257,31 +256,30 @@ const handleEditSubmit = async (e: React.FormEvent) => {
 
     // Create the update command
     const updateCommand: UpdateEventCommand = {
-      id: editingEvent.id,
+      eventId: editingEvent.eventId,
       title: editingEvent.title,
       description: editingEvent.description,
-      location: editingEvent.location,
       latitude: editingEvent.latitude,
       longitude: editingEvent.longitude,
       startDateTime: startDateTime.toISOString(),
       endDateTime: endDateTime.toISOString(),
-      eventCategoryId: editingEvent.eventCategoryId,
-      environmentalData: {
-        carbonFootprint: editingEvent.environmentalData?.carbonFootprint || 0,
-        renewableEnergyUse: editingEvent.environmentalData?.renewableEnergyUse || 0,
-        wasteReduction: editingEvent.environmentalData?.wasteReduction || 0
-      }
+      categoryId: editingEvent.categoryId,
+      isPublic: editingEvent.isPublic
+      // environmentalData: {
+      //   carbonFootprint: editingEvent.environmentalData?.carbonFootprint || 0,
+      //   renewableEnergyUse: editingEvent.environmentalData?.renewableEnergyUse || 0,
+      //   wasteReduction: editingEvent.environmentalData?.wasteReduction || 0
+      // }
       // Note: We don't send images to the backend as you mentioned the backend doesn't have an image attribute
     };
 
-    await updateEvent(updateCommand);
+    await updateEvent(editingEvent.eventId,updateCommand);
     
     // Handle image uploads if needed (client-side only)
     // You might want to add your own logic to store these images somewhere
     
     // Close modal and refresh data
     setIsEditModalOpen(false);
-    fetchEvents();
     
     // Reset state
     setEditingEvent(null);
