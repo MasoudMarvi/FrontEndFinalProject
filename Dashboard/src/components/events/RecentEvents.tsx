@@ -27,11 +27,35 @@ interface FormattedEvent {
 // Placeholder image for events without images
 const DEFAULT_IMAGE = "/images/event/event-default.jpg";
 
+// Base URL for event images - use the full URL to your API
+const IMAGE_BASE_URL = 'https://localhost:7235/uploads/events/';
+
 // Helper function to get the first available image from an event
 function getEventImage(event: EventDto): string {
-  if (event.picture1) return event.picture1;
-  if (event.picture2) return event.picture2;
-  if (event.picture3) return event.picture3;
+  if (event.picture1) {
+    // Try to use the first picture from the event
+    try {
+      // Clean up the path to avoid duplication
+      const cleanPath = event.picture1.replace(/^\/uploads\/events\//, '');
+      return cleanPath ? `${IMAGE_BASE_URL}${cleanPath}` : DEFAULT_IMAGE;
+    } catch (err) {
+      return DEFAULT_IMAGE;
+    }
+  } else if (event.picture2) {
+    try {
+      const cleanPath = event.picture2.replace(/^\/uploads\/events\//, '');
+      return cleanPath ? `${IMAGE_BASE_URL}${cleanPath}` : DEFAULT_IMAGE;
+    } catch (err) {
+      return DEFAULT_IMAGE;
+    }
+  } else if (event.picture3) {
+    try {
+      const cleanPath = event.picture3.replace(/^\/uploads\/events\//, '');
+      return cleanPath ? `${IMAGE_BASE_URL}${cleanPath}` : DEFAULT_IMAGE;
+    } catch (err) {
+      return DEFAULT_IMAGE;
+    }
+  }
   return DEFAULT_IMAGE;
 }
 
@@ -253,17 +277,11 @@ export default function RecentEvents() {
               <TableRow key={event.id} className="">
                 <TableCell className="py-3">
                   <div className="flex items-center gap-3">
-                    <div className="h-[50px] w-[50px] overflow-hidden rounded-md">
-                      <Image
-                        width={50}
-                        height={50}
-                        src={event.image}
+                    <div className="h-[50px] w-[50px] overflow-hidden rounded-md relative">
+                      <img
+                        src={DEFAULT_IMAGE}
                         className="h-[50px] w-[50px] object-cover"
                         alt={event.title}
-                        onError={(e) => {
-                          // Fallback to default image if loading fails
-                          (e.target as HTMLImageElement).src = DEFAULT_IMAGE;
-                        }}
                       />
                     </div>
                     <div>
@@ -271,7 +289,7 @@ export default function RecentEvents() {
                         {event.title}
                       </p>
                       <span className="text-gray-500 text-theme-xs dark:text-gray-400">
-                        {event.category}
+                        {event.id}
                       </span>
                     </div>
                   </div>
