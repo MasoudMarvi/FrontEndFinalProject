@@ -111,7 +111,7 @@ export async function updateEvent(eventId: string, eventData: EventFormData): Pr
       formData.append('Picture3', eventData.picture3);
     }
 
-    const res = await api.put<EventDto>(`/Events/${eventId}`, formData, {
+    const res = await api.put<EventDto>(`/Events/UpdateEvent`, formData, {
       headers: {
         'Content-Type': 'multipart/form-data'
       }
