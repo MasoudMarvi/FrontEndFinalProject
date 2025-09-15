@@ -70,12 +70,12 @@
       - event
         - Elogo1.png
         - Elogo2.png
-        - Elogo3.png
         - event-01.jpg
         - event-02.jpg
         - event-03.jpg
         - event-04.jpg
         - event-05.jpg
+        - event-default.jpg
       - favicon.ico
       - grid-image
         - image-01.png
@@ -315,7 +315,7 @@
           - VideosExample.tsx
           - YouTubeEmbed.tsx
       - user-profile
-        - PasswordResetCard.tsx
+        - ResetPasswordCard.tsx
         - UserAddressCard.tsx
         - UserInfoCard.tsx
         - UserMetaCard.tsx
@@ -402,6 +402,7 @@
         - auth.ts
         - chatMessages.ts
         - contactMessages.ts
+        - environmentalData.ts
         - eventCategories.ts
         - events.ts
         - index.ts
