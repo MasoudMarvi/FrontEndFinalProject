@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useGoogleMaps } from '@/context/GoogleMapsContext';
 import { getEvents, getEventsByCategory } from '@/lib/api/events';
 import { getEventCategories } from '@/lib/api/eventCategories';
-import { EventDto, EventCategoryDto } from '@/lib/api/types';
+import { EventDto, EventCategoryDto, EventStatus } from '@/lib/api/types';
 
 // Define the type for event data
 interface MapEventData {
@@ -21,6 +21,7 @@ interface MapEventData {
   category: string;
   categoryId: string;
   isPublic: boolean;
+  status: EventStatus;
 }
 
 const containerStyle = {
@@ -62,6 +63,34 @@ function getCategoryPinColor(category: string): string {
   }
   
   return "gray"; // Default to gray
+}
+
+// Helper function to get status display text
+function getStatusDisplay(status: EventStatus): string {
+  switch(status) {
+    case EventStatus.Pending:
+      return 'Pending';
+    case EventStatus.Active:
+      return 'Active';
+    case EventStatus.Cancelled:
+      return 'Cancelled';
+    default:
+      return 'Unknown';
+  }
+}
+
+// Helper function to get status color
+function getStatusColor(status: EventStatus): string {
+  switch(status) {
+    case EventStatus.Pending:
+      return 'bg-yellow-100 text-yellow-800';
+    case EventStatus.Active:
+      return 'bg-green-100 text-green-800';
+    case EventStatus.Cancelled:
+      return 'bg-red-100 text-red-800';
+    default:
+      return 'bg-gray-100 text-gray-800';
+  }
 }
 
 const EventsMap = () => {
@@ -114,7 +143,8 @@ const EventsMap = () => {
           endDateTime: event.endDateTime,
           category: event.categoryName || 'Uncategorized',
           categoryId: event.categoryId,
-          isPublic: event.isPublic
+          isPublic: event.isPublic,
+          status: event.status
         }));
         
         setEvents(mappedEvents);
@@ -199,17 +229,27 @@ const EventsMap = () => {
             >
               <div className="p-2 max-w-xs">
                 <h4 className="font-bold text-gray-900">{selectedEvent.title}</h4>
-                <p className="text-sm text-gray-700 mt-1">{selectedEvent.description}</p>
-                <div className="flex items-center mt-2">
+                <p className="text-sm text-gray-700 mt-2">{selectedEvent.description}</p>
+                
+                <div className="flex flex-wrap items-center gap-1 mt-2">
+                  {/* Category tag */}
                   <span className="inline-block px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800">
                     {selectedEvent.category}
                   </span>
+                  
+                  {/* Status tag */}
+                  <span className={`inline-block px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(selectedEvent.status)}`}>
+                    {getStatusDisplay(selectedEvent.status)}
+                  </span>
+                  
+                  {/* Private tag */}
                   {!selectedEvent.isPublic && (
-                    <span className="inline-block ml-1 px-2 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800">
+                    <span className="inline-block px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
                       Private
                     </span>
                   )}
                 </div>
+                
                 <p className="text-xs text-gray-500 mt-2">
                   {new Date(selectedEvent.startDateTime).toLocaleDateString()} - {new Date(selectedEvent.endDateTime).toLocaleDateString()}
                 </p>
@@ -257,6 +297,18 @@ const EventsMap = () => {
               }}
             ></div>
             <span className="text-xs text-gray-600 dark:text-gray-300">{category.categoryName}</span>
+          </div>
+        ))}
+      </div>
+      
+      {/* Status Legend */}
+      <div className="flex flex-wrap items-center gap-3 mt-2 px-2">
+        <span className="text-sm text-gray-500 dark:text-gray-400">Status:</span>
+        {[EventStatus.Pending, EventStatus.Active, EventStatus.Cancelled].map((status) => (
+          <div key={status} className="flex items-center gap-1">
+            <span className={`inline-block px-2 py-0.5 text-xs font-semibold rounded-full ${getStatusColor(status)}`}>
+              {getStatusDisplay(status)}
+            </span>
           </div>
         ))}
       </div>

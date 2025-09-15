@@ -11,7 +11,7 @@ import {
 import Badge from "../ui/badge/Badge";
 import Image from "next/image";
 import { getEvents } from "@/lib/api/events";
-import { EventDto } from "@/lib/api/types";
+import { EventDto, EventStatus } from "@/lib/api/types";
 
 // Define the TypeScript interface for our formatted event data
 interface FormattedEvent {
@@ -19,12 +19,73 @@ interface FormattedEvent {
   title: string;
   category: string;
   date: string;
-  status: "Upcoming" | "In Progress" | "Completed" | "Cancelled";
+  status: "Pending" | "Active" | "Cancelled";
+  statusCode: EventStatus;
   image: string;
 }
 
 // Placeholder image for events without images
 const DEFAULT_IMAGE = "/images/event/event-default.jpg";
+
+// Base URL for event images - use the full URL to your API
+const IMAGE_BASE_URL = 'https://localhost:7235/uploads/events/';
+
+// Helper function to get the first available image from an event
+function getEventImage(event: EventDto): string {
+  if (event.picture1) {
+    // Try to use the first picture from the event
+    try {
+      // Clean up the path to avoid duplication
+      const cleanPath = event.picture1.replace(/^\/uploads\/events\//, '');
+      return cleanPath ? `${IMAGE_BASE_URL}${cleanPath}` : DEFAULT_IMAGE;
+    } catch (err) {
+      return DEFAULT_IMAGE;
+    }
+  } else if (event.picture2) {
+    try {
+      const cleanPath = event.picture2.replace(/^\/uploads\/events\//, '');
+      return cleanPath ? `${IMAGE_BASE_URL}${cleanPath}` : DEFAULT_IMAGE;
+    } catch (err) {
+      return DEFAULT_IMAGE;
+    }
+  } else if (event.picture3) {
+    try {
+      const cleanPath = event.picture3.replace(/^\/uploads\/events\//, '');
+      return cleanPath ? `${IMAGE_BASE_URL}${cleanPath}` : DEFAULT_IMAGE;
+    } catch (err) {
+      return DEFAULT_IMAGE;
+    }
+  }
+  return DEFAULT_IMAGE;
+}
+
+// Helper function to map EventStatus to display status
+function getStatusDisplay(status: EventStatus): "Pending" | "Active" | "Cancelled" {
+  switch (status) {
+    case EventStatus.Pending:
+      return "Pending";
+    case EventStatus.Active:
+      return "Active";
+    case EventStatus.Cancelled:
+      return "Cancelled";
+    default:
+      return "Pending";
+  }
+}
+
+// Helper function to map status to badge color
+function getStatusColor(status: EventStatus): "success" | "warning" | "info" | "error" {
+  switch (status) {
+    case EventStatus.Pending:
+      return "warning";
+    case EventStatus.Active:
+      return "success";
+    case EventStatus.Cancelled:
+      return "error";
+    default:
+      return "info";
+  }
+}
 
 export default function RecentEvents() {
   const [events, setEvents] = useState<FormattedEvent[]>([]);
@@ -41,20 +102,6 @@ export default function RecentEvents() {
         // Format the events data
         const formattedEvents: FormattedEvent[] = eventsData
           .map((event: EventDto) => {
-            // Calculate event status based on dates
-            const now = new Date();
-            const startDate = new Date(event.startDateTime);
-            const endDate = new Date(event.endDateTime);
-            
-            let status: "Upcoming" | "In Progress" | "Completed" | "Cancelled" = "Upcoming";
-            if (now < startDate) {
-              status = "Upcoming";
-            } else if (now >= startDate && now <= endDate) {
-              status = "In Progress";
-            } else if (now > endDate) {
-              status = "Completed";
-            }
-            
             return {
               id: event.eventId,
               title: event.title || "Untitled Event",
@@ -64,9 +111,10 @@ export default function RecentEvents() {
                 day: "numeric",
                 year: "numeric"
               }),
-              status,
-              // Use a placeholder image or an actual event image if available
-              image: DEFAULT_IMAGE // In a real implementation, you'd get this from your event data
+              status: getStatusDisplay(event.status),
+              statusCode: event.status,
+              // Use the first available image or default
+              image: getEventImage(event)
             };
           })
           // Sort by date (newest first)
@@ -229,11 +277,9 @@ export default function RecentEvents() {
               <TableRow key={event.id} className="">
                 <TableCell className="py-3">
                   <div className="flex items-center gap-3">
-                    <div className="h-[50px] w-[50px] overflow-hidden rounded-md">
-                      <Image
-                        width={50}
-                        height={50}
-                        src={event.image}
+                    <div className="h-[50px] w-[50px] overflow-hidden rounded-md relative">
+                      <img
+                        src={DEFAULT_IMAGE}
                         className="h-[50px] w-[50px] object-cover"
                         alt={event.title}
                       />
@@ -243,7 +289,7 @@ export default function RecentEvents() {
                         {event.title}
                       </p>
                       <span className="text-gray-500 text-theme-xs dark:text-gray-400">
-                        {event.category}
+                        {event.id}
                       </span>
                     </div>
                   </div>
@@ -266,15 +312,7 @@ export default function RecentEvents() {
                 <TableCell className="py-3 text-gray-500 text-theme-sm dark:text-gray-400">
                   <Badge
                     size="sm"
-                    color={
-                      event.status === "Upcoming"
-                        ? "success"
-                        : event.status === "In Progress"
-                        ? "warning"
-                        : event.status === "Completed"
-                        ? "info"
-                        : "error"
-                    }
+                    color={getStatusColor(event.statusCode)}
                   >
                     {event.status}
                   </Badge>

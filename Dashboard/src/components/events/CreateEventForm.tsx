@@ -12,14 +12,13 @@ import { GoogleMap, Marker } from '@react-google-maps/api';
 import { useGoogleMaps } from "@/context/GoogleMapsContext";
 import { getEventCategories } from "@/lib/api/eventCategories";
 import { createEvent } from "@/lib/api/events";
-import { EventCategoryDto } from "@/lib/api/types";
-// Removed toast import
+import { EventCategoryDto, EventStatus } from "@/lib/api/types";
 
 export default function CreateEventForm() {
   const router = useRouter();
   const { isLoaded } = useGoogleMaps();
   
-  // State for images (now supporting 3 images)
+  // State for images (supporting 3 images)
   const [imageFiles, setImageFiles] = useState<(File | null)[]>([null, null, null]);
   const [imagePreviews, setImagePreviews] = useState<(string | null)[]>([null, null, null]);
   
@@ -34,6 +33,7 @@ export default function CreateEventForm() {
   const [location, setLocation] = useState<{lat: number, lng: number} | null>(null);
   const [locationName, setLocationName] = useState("");
   const [isPublic, setIsPublic] = useState(false);
+  const [status, setStatus] = useState<EventStatus>(EventStatus.Pending);
   const [loading, setLoading] = useState(false);
   
   // Form feedback
@@ -61,6 +61,9 @@ export default function CreateEventForm() {
       try {
         const data = await getEventCategories();
         setCategories(data);
+        if (data.length > 0) {
+          setCategoryId(data[0].categoryId);
+        }
       } catch (error) {
         console.error("Error fetching categories:", error);
         setErrorMessage("Failed to load event categories");
@@ -144,8 +147,35 @@ export default function CreateEventForm() {
     setLoading(true);
     
     try {
-      // Prepare the event data according to your API schema
-      const eventData = {
+      // Prepare the event data according to the updated API schema
+      const formData = new FormData();
+      
+      // Add all non-file fields
+      formData.append('Title', title);
+      formData.append('Description', description);
+      formData.append('Latitude', location.lat.toString());
+      formData.append('Longitude', location.lng.toString());
+      formData.append('StartDateTime', startDateTime);
+      formData.append('EndDateTime', endDateTime);
+      formData.append('IsPublic', isPublic.toString());
+      formData.append('CategoryId', categoryId);
+      formData.append('Status', status.toString());
+      
+      // Add images if available
+      if (imageFiles[0]) {
+        formData.append('Picture1', imageFiles[0]);
+      }
+      
+      if (imageFiles[1]) {
+        formData.append('Picture2', imageFiles[1]);
+      }
+      
+      if (imageFiles[2]) {
+        formData.append('Picture3', imageFiles[2]);
+      }
+      
+      // Call the API to create the event with the updated implementation
+      const result = await createEvent({
         title,
         description,
         latitude: location.lat,
@@ -154,12 +184,11 @@ export default function CreateEventForm() {
         endDateTime,
         isPublic,
         categoryId,
-      };
-      
-      // Call the API to create the event using your existing function
-      const result = await createEvent(eventData);
-      
-      // Note: We're not handling the images upload since the backend doesn't support it yet
+        status,
+        picture1: imageFiles[0] || undefined,
+        picture2: imageFiles[1] || undefined,
+        picture3: imageFiles[2] || undefined
+      });
       
       setSuccessMessage("Event created successfully!");
       
@@ -218,7 +247,7 @@ export default function CreateEventForm() {
             />
           </div>
           
-          {/* Event Images Upload - Now supporting 3 images */}
+          {/* Event Images Upload - Supporting 3 images */}
           <div>
             <Label htmlFor="eventImages">
               Event Images (Upload up to 3)
@@ -277,19 +306,20 @@ export default function CreateEventForm() {
           </div>
           
           {/* Event Description */}
-<div>
-  <Label htmlFor="eventDescription">
-    Description <span className="text-error-500">*</span>
-  </Label>
-  <TextArea 
-    id="eventDescription"
-    placeholder="Enter event description"
-    value={description}
-    onChange={(value) => setDescription(value)} // Change this line
-    rows={4}
-    required
-  />
-</div>
+          <div>
+            <Label htmlFor="eventDescription">
+              Description <span className="text-error-500">*</span>
+            </Label>
+            <TextArea 
+              id="eventDescription"
+              placeholder="Enter event description"
+              value={description}
+              onChange={(value) => setDescription(value)}
+              rows={4}
+              required
+            />
+          </div>
+          
           {/* Event Category */}
           <div>
             <Label htmlFor="eventCategory">
@@ -309,6 +339,23 @@ export default function CreateEventForm() {
                   {category.categoryName}
                 </option>
               ))}
+            </Select>
+          </div>
+
+          {/* Event Status */}
+          <div>
+            <Label htmlFor="eventStatus">
+              Status
+            </Label>
+            <Select
+              id="eventStatus"
+              className="w-full"
+              value={status.toString()}
+              onChange={(e) => setStatus(parseInt(e.target.value) as EventStatus)}
+            >
+              <option value={EventStatus.Pending.toString()}>Pending</option>
+              <option value={EventStatus.Active.toString()}>Active</option>
+              <option value={EventStatus.Cancelled.toString()}>Cancelled</option>
             </Select>
           </div>
           
@@ -449,16 +496,16 @@ export default function CreateEventForm() {
           </div>
           
           {/* Make this event public */}
-<div className="flex items-center">
-  <Checkbox 
-    id="isPublic" 
-    checked={isPublic}
-    onChange={(checked) => setIsPublic(checked)} // Change this line
-  />
-  <Label htmlFor="isPublic" className="mb-0">
-    Make this event public
-  </Label>
-</div>
+          <div className="flex items-center">
+            <Checkbox 
+              id="isPublic" 
+              checked={isPublic}
+              onChange={(checked) => setIsPublic(checked)}
+            />
+            <Label htmlFor="isPublic" className="mb-0">
+              Make this event public
+            </Label>
+          </div>
           
           {/* Submit Button */}
           <div>

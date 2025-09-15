@@ -398,8 +398,8 @@
       - SidebarWidget.tsx
     - lib
       - api
-        -  auth.ts
         - about.ts
+        - auth.ts
         - chatMessages.ts
         - contactMessages.ts
         - eventCategories.ts

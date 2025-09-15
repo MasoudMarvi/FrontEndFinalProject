@@ -8,11 +8,24 @@ import { GoogleMap, Marker } from '@react-google-maps/api';
 import { useGoogleMaps } from '@/context/GoogleMapsContext';
 import { getEvents, getEventById, updateEvent, deleteEvent } from '@/lib/api/events';
 import { getEventCategories } from '@/lib/api/eventCategories';
-import { EventDto, EventDetailDto, EventCategoryDto, UpdateEventCommand } from '@/lib/api/types';
+import { 
+  EventDto, 
+  EventDetailDto, 
+  EventCategoryDto, 
+  UpdateEventCommand,
+  EventStatus
+} from '@/lib/api/types';
+import { 
+  getEnvironmentalDataByEventId, 
+  createEnvironmentalData,
+  updateEnvironmentalData,
+  deleteEnvironmentalData
+} from '@/lib/api/environmentalData';
 
 // Define the environmental data type
 interface EnvironmentalData {
   id: string;
+  eventId: string;
   type: string;  // Air Quality, Noise Level, Water Quality, etc.
   value: number;
   unit: string;  // ppm, dB, etc.
@@ -33,7 +46,16 @@ interface ExtendedEventData extends EventDto {
   time: string;
   hasEnvironmentalData: boolean;
   organizer: string;
+  picture1?: string;
+  picture2?: string;
+  picture3?: string;
 }
+
+// Default image for events with no images
+const DEFAULT_IMAGE = "/images/event/event-default.jpg";
+
+// Base URL for event images
+const IMAGE_BASE_URL = 'https://localhost:7235/uploads/events/';
 
 // Map component
 const MapComponent = ({ 
@@ -84,12 +106,19 @@ const MapComponent = ({
   ) : <div className="h-[300px] bg-gray-100 dark:bg-gray-800 flex items-center justify-center">Loading Map...</div>;
 };
 
+// Helper function to get image URL from backend path
+function getImageUrl(imagePath: string | null | undefined): string {
+  if (!imagePath) return DEFAULT_IMAGE;
+  // Clean up the path to avoid duplication
+  const cleanPath = imagePath.replace(/^\/uploads\/events\//, '');
+  return cleanPath ? `${IMAGE_BASE_URL}${cleanPath}` : DEFAULT_IMAGE;
+}
+
 export default function ManageEvents() {
   const [events, setEvents] = useState<ExtendedEventData[]>([]);
   const [selectedCategory, setSelectedCategory] = useState('All Categories');
   const [selectedStatus, setSelectedStatus] = useState('All Status');
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [isImagesModalOpen, setIsImagesModalOpen] = useState(false);
   const [isEnvDataModalOpen, setIsEnvDataModalOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<ExtendedEventData | null>(null);
   const [editingEnvData, setEditingEnvData] = useState<EnvironmentalData | null>(null);
@@ -99,11 +128,13 @@ export default function ManageEvents() {
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [startDate, setStartDate] = useState<string>('');
-const [startTime, setStartTime] = useState<string>('');
-const [endDate, setEndDate] = useState<string>('');
-const [endTime, setEndTime] = useState<string>('');
-const [imageUrls, setImageUrls] = useState<string[]>([]);
-const [removedImageIndexes, setRemovedImageIndexes] = useState<number[]>([]);
+  const [startTime, setStartTime] = useState<string>('');
+  const [endDate, setEndDate] = useState<string>('');
+  const [endTime, setEndTime] = useState<string>('');
+  const [imageUrls, setImageUrls] = useState<string[]>([]);
+  const [removedImageIndexes, setRemovedImageIndexes] = useState<number[]>([]);
+  const [isRefreshingData, setIsRefreshingData] = useState(false);
+  const [envDataLoading, setEnvDataLoading] = useState(false);
   
   // Fetch events and categories on component mount
   useEffect(() => {
@@ -129,9 +160,13 @@ const [removedImageIndexes, setRemovedImageIndexes] = useState<number[]>([]);
           },
           date: new Date(event.startDateTime).toISOString().split('T')[0],
           time: new Date(event.startDateTime).toTimeString().substring(0, 5),
-          hasEnvironmentalData: false, // We don't have this info from API
+          hasEnvironmentalData: false, // We'll fetch this separately
           environmentalData: [],
-          images: [],
+          images: [
+            event.picture1 ? getImageUrl(event.picture1) : null,
+            event.picture2 ? getImageUrl(event.picture2) : null,
+            event.picture3 ? getImageUrl(event.picture3) : null,
+          ].filter(Boolean) as string[], // Remove null/undefined values
           organizer: event.creatorName || 'Unknown',
         }));
         
@@ -145,20 +180,22 @@ const [removedImageIndexes, setRemovedImageIndexes] = useState<number[]>([]);
     };
     
     fetchData();
-  }, []);
+  }, [isRefreshingData]);
   
   // Filter events based on category and status
   const filteredEvents = events.filter(event => {
     const matchesCategory = selectedCategory === 'All Categories' || event.categoryName === selectedCategory;
     
-    // For status filtering, map our status values to the API's boolean fields
+    // For status filtering
     let statusMatch = true;
-    if (selectedStatus === 'Active') {
-      statusMatch = true; // All events are considered active for now
-    } else if (selectedStatus === 'Pending') {
-      statusMatch = false; // We don't have a pending status in the API
-    } else if (selectedStatus === 'Cancelled') {
-      statusMatch = false; // We don't have a cancelled status in the API
+    if (selectedStatus !== 'All Status') {
+      if (selectedStatus === 'Active') {
+        statusMatch = event.status === EventStatus.Active;
+      } else if (selectedStatus === 'Pending') {
+        statusMatch = event.status === EventStatus.Pending;
+      } else if (selectedStatus === 'Cancelled') {
+        statusMatch = event.status === EventStatus.Cancelled;
+      }
     }
     
     return matchesCategory && statusMatch;
@@ -177,34 +214,56 @@ const [removedImageIndexes, setRemovedImageIndexes] = useState<number[]>([]);
     }
   };
 
-const handleEdit = async (event: ExtendedEventData) => {
-  try {
-    setEditingEvent({...event});
-    
-    // Set date and time fields
-    const startDateTime = new Date(event.startDateTime);
-    const endDateTime = new Date(event.endDateTime);
-    
-    setStartDate(startDateTime.toISOString().split('T')[0]);
-    setStartTime(startDateTime.toTimeString().substring(0, 5));
-    setEndDate(endDateTime.toISOString().split('T')[0]);
-    setEndTime(endDateTime.toTimeString().substring(0, 5));
-    
-    // Initialize image URLs if available
-    if (event.images && event.images.length > 0) {
-      setImageUrls(event.images);
-    } else {
-      setImageUrls([]);
+  const handleEdit = async (event: ExtendedEventData) => {
+    try {
+      setEditingEvent({...event});
+      
+      // Set date and time fields
+      const startDateTime = new Date(event.startDateTime);
+      const endDateTime = new Date(event.endDateTime);
+      
+      setStartDate(startDateTime.toISOString().split('T')[0]);
+      setStartTime(startDateTime.toTimeString().substring(0, 5));
+      setEndDate(endDateTime.toISOString().split('T')[0]);
+      setEndTime(endDateTime.toTimeString().substring(0, 5));
+      
+      // Initialize image URLs from event pictures
+      const images: string[] = [];
+      if (event.picture1) images.push(getImageUrl(event.picture1));
+      if (event.picture2) images.push(getImageUrl(event.picture2));
+      if (event.picture3) images.push(getImageUrl(event.picture3));
+      
+      setImageUrls(images);
+      setNewImageFiles([]);
+      setRemovedImageIndexes([]);
+      
+      // Fetch environmental data for this event
+      setEnvDataLoading(true);
+      try {
+        const envData = await getEnvironmentalDataByEventId(event.eventId);
+        if (envData && envData.length > 0) {
+          setEditingEvent(prev => {
+            if (!prev) return null;
+            return {
+              ...prev,
+              environmentalData: envData,
+              hasEnvironmentalData: true
+            };
+          });
+        }
+      } catch (envError) {
+        console.error('Error fetching environmental data:', envError);
+      } finally {
+        setEnvDataLoading(false);
+      }
+      
+      setIsEditModalOpen(true);
+    } catch (err) {
+      console.error('Error setting up event editing:', err);
+      alert('Failed to load event details. Please try again.');
     }
-    
-    setNewImageFiles([]);
-    setRemovedImageIndexes([]);
-    setIsEditModalOpen(true);
-  } catch (err) {
-    console.error('Error setting up event editing:', err);
-    alert('Failed to load event details. Please try again.');
-  }
-};
+  };
+  
   // Handle form field changes
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -245,96 +304,72 @@ const handleEdit = async (event: ExtendedEventData) => {
     });
   };
 
-const handleEditSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
-  if (!editingEvent) return;
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingEvent) return;
 
-  try {
-    // Create start and end date-times by combining date and time
-    const startDateTime = new Date(`${startDate}T${startTime}`);
-    const endDateTime = new Date(`${endDate}T${endTime}`);
+    try {
+      // Create start and end date-times by combining date and time
+      const startDateTime = new Date(`${startDate}T${startTime}`);
+      const endDateTime = new Date(`${endDate}T${endTime}`);
 
-    // Create the update command
-    const updateCommand: UpdateEventCommand = {
-      eventId: editingEvent.eventId,
-      title: editingEvent.title,
-      description: editingEvent.description,
-      latitude: editingEvent.latitude,
-      longitude: editingEvent.longitude,
-      startDateTime: startDateTime.toISOString(),
-      endDateTime: endDateTime.toISOString(),
-      categoryId: editingEvent.categoryId,
-      isPublic: editingEvent.isPublic
-      // environmentalData: {
-      //   carbonFootprint: editingEvent.environmentalData?.carbonFootprint || 0,
-      //   renewableEnergyUse: editingEvent.environmentalData?.renewableEnergyUse || 0,
-      //   wasteReduction: editingEvent.environmentalData?.wasteReduction || 0
-      // }
-      // Note: We don't send images to the backend as you mentioned the backend doesn't have an image attribute
-    };
+      // Create the update command
+      const updateCommand: UpdateEventCommand = {
+        eventId: editingEvent.eventId,
+        title: editingEvent.title,
+        description: editingEvent.description,
+        latitude: editingEvent.latitude,
+        longitude: editingEvent.longitude,
+        startDateTime: startDateTime.toISOString(),
+        endDateTime: endDateTime.toISOString(),
+        categoryId: editingEvent.categoryId,
+        isPublic: editingEvent.isPublic,
+        status: editingEvent.status || EventStatus.Active
+        // Note: We don't send images or environmental data here - those are handled separately
+      };
 
-    await updateEvent(editingEvent.eventId,updateCommand);
-    
-    // Handle image uploads if needed (client-side only)
-    // You might want to add your own logic to store these images somewhere
-    
-    // Close modal and refresh data
-    setIsEditModalOpen(false);
-    
-    // Reset state
-    setEditingEvent(null);
-    setNewImageFiles([]);
-    setImageUrls([]);
-    setRemovedImageIndexes([]);
-    
-  } catch (err) {
-    console.error('Error updating event:', err);
-    alert('Failed to update event. Please try again.');
-  }
-};
+      await updateEvent(editingEvent.eventId, updateCommand);
+      
+      // Handle image uploads if needed - this would be implemented in a real app
+      // For now we're just simulating that the images were updated
+      
+      // Close modal and refresh data
+      setIsEditModalOpen(false);
+      
+      // Reset state
+      setEditingEvent(null);
+      setNewImageFiles([]);
+      setImageUrls([]);
+      setRemovedImageIndexes([]);
+      
+      // Refresh the events list
+      setIsRefreshingData(prev => !prev);
+      
+    } catch (err) {
+      console.error('Error updating event:', err);
+      alert('Failed to update event. Please try again.');
+    }
+  };
+  
   // Handle file upload
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       const filesArray = Array.from(e.target.files);
-      setNewImageFiles(prev => [...prev, ...filesArray]);
-    }
-  };
-
-  // Handle removing a new image
-  const handleRemoveNewImage = (index: number) => {
-    setNewImageFiles(prev => prev.filter((_, i) => i !== index));
-  };
-
-  // Handle removing an existing image
-  const handleRemoveExistingImage = (index: number) => {
-    if (editingEvent && editingEvent.images) {
-      const updatedImages = [...editingEvent.images];
-      updatedImages.splice(index, 1);
-      setEditingEvent({
-        ...editingEvent,
-        images: updatedImages
-      });
-    }
-  };
-
-  // Save images
-  const handleImageSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!editingEvent) return;
-    
-    if (newImageFiles.length > 0) {
-      // In a real app, you would upload the files to a server
-      // For now, we'll just create object URLs
-      const newImageUrls = newImageFiles.map(file => URL.createObjectURL(file));
       
-      setEditingEvent({
-        ...editingEvent,
-        images: [...(editingEvent.images || []), ...newImageUrls]
-      });
+      // Calculate how many more images we can add
+      const currentImages = imageUrls.length - removedImageIndexes.length;
+      const maxAdditionalImages = 3 - currentImages;
       
-      setNewImageFiles([]);
-      setIsImagesModalOpen(false);
+      if (filesArray.length > maxAdditionalImages) {
+        alert(`You can only add ${maxAdditionalImages} more image${maxAdditionalImages !== 1 ? 's' : ''}. The total limit is 3 images per event.`);
+        // Take only the allowed number of files
+        setNewImageFiles(prev => [...prev, ...filesArray.slice(0, maxAdditionalImages)]);
+      } else {
+        setNewImageFiles(prev => [...prev, ...filesArray]);
+      }
+      
+      // Reset the input value to allow selecting the same file again
+      e.target.value = '';
     }
   };
 
@@ -343,11 +378,13 @@ const handleEditSubmit = async (e: React.FormEvent) => {
     if (!editingEvent) return;
     
     const newEnvData: EnvironmentalData = {
-      id: `env${Date.now()}`,
+      id: '', // Empty ID for new records - backend will assign a real ID
+      eventId: editingEvent.eventId,
       type: '',
       value: 0,
       unit: '',
       timestamp: new Date().toISOString(),
+      description: ''
     };
     
     setEditingEnvData(newEnvData);
@@ -367,33 +404,38 @@ const handleEditSubmit = async (e: React.FormEvent) => {
   };
 
   // Save environmental data
-  const handleEnvDataSubmit = (e: React.FormEvent) => {
+  const handleEnvDataSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!editingEvent || !editingEnvData) return;
     
-    const updatedEvent = { ...editingEvent };
-    
-    if (!updatedEvent.environmentalData) {
-      updatedEvent.environmentalData = [];
+    try {
+      // This is a new API call specifically for environmental data
+      if (editingEnvData.id) {
+        // Update existing environmental data
+        await updateEnvironmentalData(editingEnvData.id, editingEnvData);
+      } else {
+        // Create new environmental data
+        await createEnvironmentalData(editingEnvData);
+      }
+      
+      // Fetch updated environmental data
+      const updatedEnvData = await getEnvironmentalDataByEventId(editingEvent.eventId);
+      
+      // Update the editing event with new environmental data
+      setEditingEvent({
+        ...editingEvent,
+        environmentalData: updatedEnvData,
+        hasEnvironmentalData: updatedEnvData.length > 0
+      });
+      
+      setIsEnvDataModalOpen(false);
+      setEditingEnvData(null);
+      
+    } catch (error) {
+      console.error('Error saving environmental data:', error);
+      alert('Failed to save environmental data. Please try again.');
     }
-    
-    // Check if we're editing an existing item or adding new
-    const existingIndex = updatedEvent.environmentalData.findIndex(item => item.id === editingEnvData.id);
-    
-    if (existingIndex >= 0) {
-      // Update existing
-      updatedEvent.environmentalData[existingIndex] = editingEnvData;
-    } else {
-      // Add new
-      updatedEvent.environmentalData.push(editingEnvData);
-    }
-    
-    updatedEvent.hasEnvironmentalData = true;
-    
-    setEditingEvent(updatedEvent);
-    setIsEnvDataModalOpen(false);
-    setEditingEnvData(null);
   };
 
   // Edit existing environmental data
@@ -403,16 +445,54 @@ const handleEditSubmit = async (e: React.FormEvent) => {
   };
 
   // Delete environmental data
-  const handleDeleteEnvData = (id: string) => {
+  const handleDeleteEnvData = async (id: string) => {
     if (!editingEvent || !editingEvent.environmentalData) return;
     
-    const updatedEnvData = editingEvent.environmentalData.filter(item => item.id !== id);
-    
-    setEditingEvent({
-      ...editingEvent,
-      environmentalData: updatedEnvData,
-      hasEnvironmentalData: updatedEnvData.length > 0
-    });
+    if (window.confirm('Are you sure you want to delete this environmental data point?')) {
+      try {
+        // Call the delete API
+        await deleteEnvironmentalData(id);
+        
+        // Update the local state
+        const updatedEnvData = editingEvent.environmentalData.filter(item => item.id !== id);
+        
+        setEditingEvent({
+          ...editingEvent,
+          environmentalData: updatedEnvData,
+          hasEnvironmentalData: updatedEnvData.length > 0
+        });
+      } catch (error) {
+        console.error('Error deleting environmental data:', error);
+        alert('Failed to delete environmental data. Please try again.');
+      }
+    }
+  };
+  
+  // Status options based on the EventStatus enum
+  const getStatusDisplayName = (status: EventStatus) => {
+    switch (status) {
+      case EventStatus.Active:
+        return 'Active';
+      case EventStatus.Pending:
+        return 'Pending';
+      case EventStatus.Cancelled:
+        return 'Cancelled';
+      default:
+        return 'Unknown';
+    }
+  };
+  
+  const getStatusColorClass = (status: EventStatus) => {
+    switch (status) {
+      case EventStatus.Active:
+        return 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400';
+      case EventStatus.Pending:
+        return 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400';
+      case EventStatus.Cancelled:
+        return 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400';
+      default:
+        return 'bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400';
+    }
   };
   
   // Create category options array with "All Categories" at the beginning
@@ -558,14 +638,15 @@ const handleEditSubmit = async (e: React.FormEvent) => {
                     <div className="flex items-center">
                       <div className="h-10 w-10 rounded-lg bg-gray-100 dark:bg-gray-800 flex items-center justify-center mr-3 overflow-hidden">
                         {event.images && event.images.length > 0 ? (
-                          <div className="relative h-full w-full">
-                            <Image
-                              src={event.images[0]}
-                              alt={event.title || ''}
-                              fill
-                              className="object-cover"
-                            />
-                          </div>
+                          <img 
+                            src={event.images[0]} 
+                            alt={event.title || ''}
+                            className="h-10 w-10 object-cover"
+                            onError={(e) => {
+                              // Fallback to default image
+                              (e.target as HTMLImageElement).src = DEFAULT_IMAGE;
+                            }}
+                          />
                         ) : (
                           <span className="text-xs font-medium">{event.title?.charAt(0) || '?'}</span>
                         )}
@@ -599,8 +680,8 @@ const handleEditSubmit = async (e: React.FormEvent) => {
                     </span>
                   </td>
                   <td className="py-3 px-4 whitespace-nowrap">
-                    <span className="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
-                      Active
+                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColorClass(event.status)}`}>
+                      {getStatusDisplayName(event.status)}
                     </span>
                   </td>
                   <td className="py-3 px-4 whitespace-nowrap text-gray-600 dark:text-gray-300">
@@ -622,14 +703,15 @@ const handleEditSubmit = async (e: React.FormEvent) => {
                       <div className="flex -space-x-2 overflow-hidden">
                         {event.images.slice(0, 3).map((img, idx) => (
                           <div key={idx} className="inline-block h-6 w-6 rounded-md ring-2 ring-white dark:ring-gray-800 overflow-hidden">
-                            <div className="relative h-full w-full">
-                              <Image
-                                src={img}
-                                alt={`${event.title} thumbnail ${idx + 1}`}
-                                fill
-                                className="object-cover"
-                              />
-                            </div>
+                            <img
+                              src={img}
+                              alt={`${event.title} thumbnail ${idx + 1}`}
+                              className="h-6 w-6 object-cover"
+                              onError={(e) => {
+                                // Fallback to default image
+                                (e.target as HTMLImageElement).src = DEFAULT_IMAGE;
+                              }}
+                            />
                           </div>
                         ))}
                         {event.images.length > 3 && (
@@ -695,434 +777,13 @@ const handleEditSubmit = async (e: React.FormEvent) => {
       </div>
       
       {/* Edit Event Modal */}
-{/* Edit Event Modal */}
-{isEditModalOpen && editingEvent && (
-  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 overflow-y-auto">
-    <div className="bg-white dark:bg-gray-800 rounded-lg w-full max-w-3xl max-h-[90vh] overflow-y-auto p-6 m-4">
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-lg font-medium text-gray-800 dark:text-white">Edit Event</h2>
-        <button 
-          onClick={() => setIsEditModalOpen(false)}
-          className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-            <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-          </svg>
-        </button>
-      </div>
-
-      <form onSubmit={handleEditSubmit} className="space-y-4">
-        <div>
-          <label htmlFor="title" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Event Title
-          </label>
-          <input
-            type="text"
-            id="title"
-            name="title"
-            value={editingEvent.title || ''}
-            onChange={handleChange}
-            required
-            className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-gray-700 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300"
-          />
-        </div>
-
-        <div>
-          <label htmlFor="description" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Description
-          </label>
-          <textarea
-            id="description"
-            name="description"
-            value={editingEvent.description || ''}
-            onChange={handleChange}
-            required
-            rows={3}
-            className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-gray-700 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300"
-          ></textarea>
-        </div>
-        
-        {/* Image Management - Updated to handle 3 images directly in the edit modal */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-            Event Images (Up to 3)
-          </label>
-          
-          {/* Display existing images with remove option */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
-            {imageUrls.map((url, index) => (
-              !removedImageIndexes.includes(index) && (
-                <div key={index} className="relative">
-                  <img 
-                    src={url} 
-                    alt={`Event image ${index + 1}`} 
-                    className="w-full h-40 object-cover rounded-lg border border-gray-200 dark:border-gray-700"
-                  />
-                  <button
-                    type="button"
-                    className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1"
-                    onClick={() => setRemovedImageIndexes([...removedImageIndexes, index])}
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                    </svg>
-                  </button>
-                </div>
-              )
-            ))}
-            
-            {/* New Image Previews */}
-            {newImageFiles.map((file, index) => (
-              <div key={`new-${index}`} className="relative">
-                <img 
-                  src={URL.createObjectURL(file)} 
-                  alt={`New event image ${index + 1}`} 
-                  className="w-full h-40 object-cover rounded-lg border border-gray-200 dark:border-gray-700"
-                />
-                <button
-                  type="button"
-                  className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1"
-                  onClick={() => {
-                    const updatedFiles = [...newImageFiles];
-                    updatedFiles.splice(index, 1);
-                    setNewImageFiles(updatedFiles);
-                  }}
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                  </svg>
-                </button>
-              </div>
-            ))}
-            
-            {/* Add Image Button (only show if less than 3 total images) */}
-            {(imageUrls.length - removedImageIndexes.length + newImageFiles.length) < 3 && (
-              <div 
-                onClick={() => fileInputRef.current?.click()}
-                className="h-40 flex items-center justify-center border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50"
-              >
-                <div className="text-center">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 mx-auto text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                  </svg>
-                  <span className="block mt-1 text-sm text-gray-500">Add Image</span>
-                </div>
-              </div>
-            )}
-          </div>
-          
-          <input
-            type="file"
-            accept="image/*"
-            className="hidden"
-            ref={fileInputRef}
-            onChange={(e) => {
-              const files = Array.from(e.target.files || []);
-              const totalImages = imageUrls.length - removedImageIndexes.length + newImageFiles.length;
-              
-              if (files.length + totalImages <= 3) {
-                setNewImageFiles([...newImageFiles, ...files]);
-              } else {
-                alert('You can only upload up to 3 images in total.');
-              }
-              
-              // Reset the input to allow selecting the same file again
-              if (e.target) e.target.value = '';
-            }}
-          />
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label htmlFor="categoryId" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Category
-            </label>
-            <select
-              id="categoryId"
-              name="categoryId"
-              value={editingEvent.categoryId}
-              onChange={handleChange}
-              required
-              className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-gray-700 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300"
-            >
-              {categories.map((category) => (
-                <option key={category.categoryId} value={category.categoryId}>
-                  {category.categoryName}
-                </option>
-              ))}
-            </select>
-          </div>
-          
-          <div>
-            <label htmlFor="isPublic" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Visibility
-            </label>
-            <select
-              id="isPublic"
-              name="isPublic"
-              value={editingEvent.isPublic.toString()}
-              onChange={(e) => {
-                setEditingEvent({
-                  ...editingEvent,
-                  isPublic: e.target.value === 'true'
-                });
-              }}
-              required
-              className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-gray-700 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300"
-            >
-              <option value="true">Public</option>
-              <option value="false">Private</option>
-            </select>
-          </div>
-        </div>
-
-        {/* Updated date/time fields with separate start/end date and time */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label htmlFor="startDate" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Start Date
-            </label>
-            <input
-              type="date"
-              id="startDate"
-              name="startDate"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              required
-              className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-gray-700 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300"
-            />
-          </div>
-          
-          <div>
-            <label htmlFor="startTime" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Start Time
-            </label>
-            <input
-              type="time"
-              id="startTime"
-              name="startTime"
-              value={startTime}
-              onChange={(e) => setStartTime(e.target.value)}
-              required
-              className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-gray-700 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300"
-            />
-          </div>
-          
-          <div>
-            <label htmlFor="endDate" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              End Date
-            </label>
-            <input
-              type="date"
-              id="endDate"
-              name="endDate"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              required
-              className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-gray-700 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300"
-            />
-          </div>
-          
-          <div>
-            <label htmlFor="endTime" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              End Time
-            </label>
-            <input
-              type="time"
-              id="endTime"
-              name="endTime"
-              value={endTime}
-              onChange={(e) => setEndTime(e.target.value)}
-              required
-              className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-gray-700 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300"
-            />
-          </div>
-        </div>
-
-        <div>
-          <label htmlFor="organizer" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Organizer
-          </label>
-          <input
-            type="text"
-            id="organizer"
-            name="organizer"
-            value={editingEvent.organizer}
-            onChange={handleChange}
-            required
-            className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-gray-700 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300"
-            disabled
-          />
-        </div>
-
-        {/* Location Selection with Map */}
-        <div>
-          <div className="flex justify-between items-center mb-1">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Location
-            </label>
-            <span className="text-xs text-gray-500 dark:text-gray-400">
-              Click on the map to set location
-            </span>
-          </div>
-          
-          <div className="mb-3 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700">
-            <MapComponent 
-              location={editingEvent.location} 
-              onLocationChange={handleLocationChange} 
-            />
-          </div>
-          
-          <div className="grid grid-cols-3 gap-4">
-            <div>
-              <label htmlFor="locationName" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Location Name
-              </label>
-              <input
-                type="text"
-                id="locationName"
-                name="location.name"
-                value={editingEvent.location.name || ''}
-                onChange={handleChange}
-                className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-gray-700 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300"
-              />
-            </div>
-            
-            <div>
-              <label htmlFor="latitude" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Latitude
-              </label>
-              <input
-                type="number"
-                step="any"
-                id="latitude"
-                name="location.lat"
-                value={editingEvent.location.lat}
-                onChange={handleChange}
-                required
-                className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-gray-700 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300"
-              />
-            </div>
-            
-            <div>
-              <label htmlFor="longitude" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Longitude
-              </label>
-              <input
-                type="number"
-                step="any"
-                id="longitude"
-                name="location.lng"
-                value={editingEvent.location.lng}
-                onChange={handleChange}
-                required
-                className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-gray-700 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300"
-              />
-            </div>
-          </div>
-        </div>
-        
-        {/* Environmental Data */}
-        <div>
-          <div className="flex justify-between items-center mb-3">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Environmental Data
-            </label>
-            <button
-              type="button"
-              onClick={handleAddEnvironmentalData}
-              className="text-xs px-2 py-1 bg-brand-50 text-brand-600 rounded hover:bg-brand-100 dark:bg-brand-900/30 dark:text-brand-400 dark:hover:bg-brand-900/50"
-            >
-              Add Data Point
-            </button>
-          </div>
-          
-          {editingEvent.environmentalData && editingEvent.environmentalData.length > 0 ? (
-            <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
-              <table className="w-full">
-                <thead>
-                  <tr className="bg-gray-50 dark:bg-gray-900/50">
-                    <th className="py-2 px-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
-                    <th className="py-2 px-3 text-left text-xs font-medium text-gray-500 uppercase">Value</th>
-                    <th className="py-2 px-3 text-left text-xs font-medium text-gray-500 uppercase">Unit</th>
-                    <th className="py-2 px-3 text-left text-xs font-medium text-gray-500 uppercase">Timestamp</th>
-                    <th className="py-2 px-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                  {editingEvent.environmentalData.map(data => (
-                    <tr key={data.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
-                      <td className="py-2 px-3 text-sm text-gray-800 dark:text-gray-300">{data.type}</td>
-                      <td className="py-2 px-3 text-sm text-gray-800 dark:text-gray-300">{data.value}</td>
-                      <td className="py-2 px-3 text-sm text-gray-800 dark:text-gray-300">{data.unit}</td>
-                      <td className="py-2 px-3 text-sm text-gray-800 dark:text-gray-300">
-                        {new Date(data.timestamp).toLocaleString()}
-                      </td>
-                      <td className="py-2 px-3 text-right">
-                        <div className="flex justify-end space-x-2">
-                          <button
-                            type="button"
-                            onClick={() => handleEditEnvData(data)}
-                            className="text-xs text-brand-600 hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteEnvData(data.id)}
-                            className="text-xs text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <div className="text-center py-4 border border-dashed border-gray-200 dark:border-gray-700 rounded-lg">
-              <p className="text-sm text-gray-500 dark:text-gray-400">No environmental data added yet.</p>
-              <button
-                type="button"
-                onClick={handleAddEnvironmentalData}
-                className="mt-2 text-sm text-brand-500 hover:text-brand-600"
-              >
-                Add data point
-              </button>
-            </div>
-          )}
-        </div>
-
-        <div className="flex justify-end gap-3 pt-4">
-          <button
-            type="button"
-            onClick={() => setIsEditModalOpen(false)}
-            className="rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            className="rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-600 focus:outline-none"
-          >
-            Save Changes
-          </button>
-        </div>
-      </form>
-    </div>
-  </div>
-)}
-      
-      {/* Image Management Modal */}
-      {isImagesModalOpen && editingEvent && (
+      {isEditModalOpen && editingEvent && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 overflow-y-auto">
-          <div className="bg-white dark:bg-gray-800 rounded-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6 m-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg w-full max-w-3xl max-h-[90vh] overflow-y-auto p-6 m-4">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-medium text-gray-800 dark:text-white">Manage Event Images</h2>
+              <h2 className="text-lg font-medium text-gray-800 dark:text-white">Edit Event</h2>
               <button 
-                onClick={() => setIsImagesModalOpen(false)}
+                onClick={() => setIsEditModalOpen(false)}
                 className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
@@ -1131,107 +792,415 @@ const handleEditSubmit = async (e: React.FormEvent) => {
               </button>
             </div>
 
-            <form onSubmit={handleImageSubmit} className="space-y-4">
-              {/* Current Images */}
-              {editingEvent.images && editingEvent.images.length > 0 && (
-                <div>
-                  <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Current Images</h3>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                    {editingEvent.images.map((image: string, index: number) => (
-                      <div key={index} className="relative group">
-                        <div className="aspect-video w-full rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700">
-                          <Image 
-                            src={image} 
-                            alt={`Event image ${index + 1}`}
-                            width={200}
-                            height={120}
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
+            <form onSubmit={handleEditSubmit} className="space-y-4">
+              <div>
+                <label htmlFor="title" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Event Title
+                </label>
+                <input
+                  type="text"
+                  id="title"
+                  name="title"
+                  value={editingEvent.title || ''}
+                  onChange={handleChange}
+                  required
+                  className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-gray-700 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="description" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Description
+                </label>
+                <textarea
+                  id="description"
+                  name="description"
+                  value={editingEvent.description || ''}
+                  onChange={handleChange}
+                  required
+                  rows={3}
+                  className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-gray-700 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300"
+                ></textarea>
+              </div>
+              
+              {/* Image Management - Updated to handle 3 images directly in the edit modal */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Event Images (Up to 3)
+                </label>
+                
+                {/* Display existing images with remove option */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+                  {imageUrls.map((url, index) => (
+                    !removedImageIndexes.includes(index) && (
+                      <div key={index} className="relative">
+                        <img 
+                          src={url} 
+                          alt={`Event image ${index + 1}`} 
+                          className="w-full h-40 object-cover rounded-lg border border-gray-200 dark:border-gray-700"
+                          onError={(e) => {
+                            // Fallback to default image
+                            (e.target as HTMLImageElement).src = DEFAULT_IMAGE;
+                          }}
+                        />
                         <button
                           type="button"
-                          onClick={() => handleRemoveExistingImage(index)}
-                          className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                          aria-label="Remove image"
+                          className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1"
+                          onClick={() => setRemovedImageIndexes([...removedImageIndexes, index])}
                         >
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                             <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
                           </svg>
                         </button>
                       </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-              
-              {/* Upload New Images */}
-              <div>
-                <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Upload New Images</h3>
-                <div className="flex items-center justify-center w-full">
-                  <label
-                    htmlFor="file-upload"
-                    className="w-full flex flex-col items-center justify-center border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-6 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-gray-400 dark:text-gray-500 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                    <div className="text-sm text-gray-600 dark:text-gray-400 text-center">
-                      <span className="font-medium text-brand-500">Click to upload</span> or drag and drop
-                      <p className="text-xs mt-1">PNG, JPG, GIF up to 10MB</p>
+                    )
+                  ))}
+                  
+                  {/* New Image Previews */}
+                  {newImageFiles.map((file, index) => (
+                    <div key={`new-${index}`} className="relative">
+                      <img 
+                        src={URL.createObjectURL(file)} 
+                        alt={`New event image ${index + 1}`} 
+                        className="w-full h-40 object-cover rounded-lg border border-gray-200 dark:border-gray-700"
+                      />
+                      <button
+                        type="button"
+                        className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1"
+                        onClick={() => {
+                          const updatedFiles = [...newImageFiles];
+                          updatedFiles.splice(index, 1);
+                          setNewImageFiles(updatedFiles);
+                        }}
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                        </svg>
+                      </button>
                     </div>
-                    <input 
-                      id="file-upload" 
-                      name="file-upload" 
-                      type="file" 
-                      className="hidden" 
-                      accept="image/*" 
-                      multiple 
-                      onChange={handleFileChange}
-                      ref={fileInputRef}
-                    />
+                  ))}
+                  
+                  {/* Add Image Button (only show if less than 3 total images) */}
+                  {(imageUrls.length - removedImageIndexes.length + newImageFiles.length) < 3 && (
+                    <div 
+                      onClick={() => fileInputRef.current?.click()}
+                      className="h-40 flex items-center justify-center border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50"
+                    >
+                      <div className="text-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 mx-auto text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                        </svg>
+                        <span className="block mt-1 text-sm text-gray-500">Add Image</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  ref={fileInputRef}
+                  onChange={handleFileChange}
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label htmlFor="categoryId" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Category
                   </label>
+                  <select
+                    id="categoryId"
+                    name="categoryId"
+                    value={editingEvent.categoryId}
+                    onChange={handleChange}
+                    required
+                    className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-gray-700 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300"
+                  >
+                    {categories.map((category) => (
+                      <option key={category.categoryId} value={category.categoryId}>
+                        {category.categoryName}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                
+                <div>
+                  <label htmlFor="isPublic" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Visibility
+                  </label>
+                  <select
+                    id="isPublic"
+                    name="isPublic"
+                    value={editingEvent.isPublic.toString()}
+                    onChange={(e) => {
+                      setEditingEvent({
+                        ...editingEvent,
+                        isPublic: e.target.value === 'true'
+                      });
+                    }}
+                    required
+                    className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-gray-700 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300"
+                  >
+                    <option value="true">Public</option>
+                    <option value="false">Private</option>
+                  </select>
+                </div>
+                
+                {/* Added Status dropdown */}
+                <div>
+                  <label htmlFor="status" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Status
+                  </label>
+                  <select
+                    id="status"
+                    name="status"
+                    value={editingEvent.status}
+                    onChange={(e) => {
+                      setEditingEvent({
+                        ...editingEvent,
+                        status: parseInt(e.target.value) as EventStatus
+                      });
+                    }}
+                    required
+                    className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-gray-700 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300"
+                  >
+                    <option value={EventStatus.Active}>Active</option>
+                    <option value={EventStatus.Pending}>Pending</option>
+                    <option value={EventStatus.Cancelled}>Cancelled</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Updated date/time fields with separate start/end date and time */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label htmlFor="startDate" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Start Date
+                  </label>
+                  <input
+                    type="date"
+                    id="startDate"
+                    name="startDate"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    required
+                    className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-gray-700 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300"
+                  />
+                </div>
+                
+                <div>
+                  <label htmlFor="startTime" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Start Time
+                  </label>
+                  <input
+                    type="time"
+                    id="startTime"
+                    name="startTime"
+                    value={startTime}
+                    onChange={(e) => setStartTime(e.target.value)}
+                    required
+                    className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-gray-700 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300"
+                  />
+                </div>
+                
+                <div>
+                  <label htmlFor="endDate" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    End Date
+                  </label>
+                  <input
+                    type="date"
+                    id="endDate"
+                    name="endDate"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    required
+                    className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-gray-700 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300"
+                  />
+                </div>
+                
+                <div>
+                  <label htmlFor="endTime" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    End Time
+                  </label>
+                  <input
+                    type="time"
+                    id="endTime"
+                    name="endTime"
+                    value={endTime}
+                    onChange={(e) => setEndTime(e.target.value)}
+                    required
+                    className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-gray-700 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label htmlFor="organizer" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Organizer
+                </label>
+                <input
+                  type="text"
+                  id="organizer"
+                  name="organizer"
+                  value={editingEvent.organizer}
+                  onChange={handleChange}
+                  required
+                  className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-gray-700 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300"
+                  disabled
+                />
+              </div>
+
+              {/* Location Selection with Map */}
+              <div>
+                <div className="flex justify-between items-center mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Location
+                  </label>
+                  <span className="text-xs text-gray-500 dark:text-gray-400">
+                    Click on the map to set location
+                  </span>
+                </div>
+                
+                <div className="mb-3 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700">
+                  <MapComponent 
+                    location={editingEvent.location} 
+                    onLocationChange={handleLocationChange} 
+                  />
+                </div>
+                
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <label htmlFor="locationName" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Location Name
+                    </label>
+                    <input
+                      type="text"
+                      id="locationName"
+                      name="location.name"
+                      value={editingEvent.location.name || ''}
+                      onChange={handleChange}
+                      className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-gray-700 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label htmlFor="latitude" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Latitude
+                    </label>
+                    <input
+                      type="number"
+                      step="any"
+                      id="latitude"
+                      name="location.lat"
+                      value={editingEvent.location.lat}
+                      onChange={handleChange}
+                      required
+                      className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-gray-700 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label htmlFor="longitude" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Longitude
+                    </label>
+                    <input
+                      type="number"
+                      step="any"
+                      id="longitude"
+                      name="location.lng"
+                      value={editingEvent.location.lng}
+                      onChange={handleChange}
+                      required
+                      className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-gray-700 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300"
+                    />
+                  </div>
                 </div>
               </div>
               
-              {/* Preview New Images */}
-              {newImageFiles.length > 0 && (
-                <div>
-                  <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">New Images to Upload</h3>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                    {newImageFiles.map((file, index) => (
-                      <div key={index} className="relative group">
-                        <div className="aspect-video w-full rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700">
-                          <Image 
-                            src={URL.createObjectURL(file)} 
-                            alt={`New image ${index + 1}`}
-                            width={200}
-                            height={120}
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-                        <div className="absolute bottom-1 left-1 right-1 text-xs text-white bg-black/50 px-1 py-0.5 truncate rounded">
-                          {file.name}
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveNewImage(index)}
-                          className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                          aria-label="Remove image"
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                            <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                          </svg>
-                        </button>
-                      </div>
-                    ))}
-                  </div>
+              {/* Environmental Data Section */}
+              <div>
+                <div className="flex justify-between items-center mb-3">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Environmental Data
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleAddEnvironmentalData}
+                    className="text-xs px-2 py-1 bg-brand-50 text-brand-600 rounded hover:bg-brand-100 dark:bg-brand-900/30 dark:text-brand-400 dark:hover:bg-brand-900/50"
+                  >
+                    Add Data Point
+                  </button>
                 </div>
-              )}
+                
+                {envDataLoading ? (
+                  <div className="flex items-center justify-center py-4">
+                    <div className="h-5 w-5 animate-spin rounded-full border-2 border-gray-200 border-t-brand-500"></div>
+                    <span className="ml-2 text-sm text-gray-500">Loading environmental data...</span>
+                  </div>
+                ) : editingEvent.environmentalData && editingEvent.environmentalData.length > 0 ? (
+                  <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="bg-gray-50 dark:bg-gray-900/50">
+                          <th className="py-2 px-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
+                          <th className="py-2 px-3 text-left text-xs font-medium text-gray-500 uppercase">Value</th>
+                          <th className="py-2 px-3 text-left text-xs font-medium text-gray-500 uppercase">Unit</th>
+                          <th className="py-2 px-3 text-left text-xs font-medium text-gray-500 uppercase">Timestamp</th>
+                          <th className="py-2 px-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                        {editingEvent.environmentalData.map(data => (
+                          <tr key={data.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                            <td className="py-2 px-3 text-sm text-gray-800 dark:text-gray-300">{data.type}</td>
+                            <td className="py-2 px-3 text-sm text-gray-800 dark:text-gray-300">{data.value}</td>
+                            <td className="py-2 px-3 text-sm text-gray-800 dark:text-gray-300">{data.unit}</td>
+                            <td className="py-2 px-3 text-sm text-gray-800 dark:text-gray-300">
+                              {new Date(data.timestamp).toLocaleString()}
+                            </td>
+                            <td className="py-2 px-3 text-right">
+                              <div className="flex justify-end space-x-2">
+                                <button
+                                  type="button"
+                                  onClick={() => handleEditEnvData(data)}
+                                  className="text-xs text-brand-600 hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300"
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteEnvData(data.id)}
+                                  className="text-xs text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+                                >
+                                  Delete
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="text-center py-4 border border-dashed border-gray-200 dark:border-gray-700 rounded-lg">
+                    <p className="text-sm text-gray-500 dark:text-gray-400">No environmental data added yet.</p>
+                    <button
+                      type="button"
+                      onClick={handleAddEnvironmentalData}
+                      className="mt-2 text-sm text-brand-500 hover:text-brand-600"
+                    >
+                      Add data point
+                    </button>
+                  </div>
+                )}
+              </div>
 
               <div className="flex justify-end gap-3 pt-4">
                 <button
                   type="button"
-                  onClick={() => setIsImagesModalOpen(false)}
+                  onClick={() => setIsEditModalOpen(false)}
                   className="rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
                 >
                   Cancel
@@ -1239,9 +1208,8 @@ const handleEditSubmit = async (e: React.FormEvent) => {
                 <button
                   type="submit"
                   className="rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-600 focus:outline-none"
-                  disabled={newImageFiles.length === 0}
                 >
-                  Save Images
+                  Save Changes
                 </button>
               </div>
             </form>
@@ -1255,10 +1223,7 @@ const handleEditSubmit = async (e: React.FormEvent) => {
           <div className="bg-white dark:bg-gray-800 rounded-lg w-full max-w-md max-h-[90vh] overflow-y-auto p-6 m-4">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-lg font-medium text-gray-800 dark:text-white">
-                {editingEnvData.id.startsWith('env') && !editingEvent?.environmentalData?.find(d => d.id === editingEnvData.id) 
-                  ? 'Add Environmental Data' 
-                  : 'Edit Environmental Data'
-                }
+                {!editingEnvData.id ? 'Add Environmental Data' : 'Edit Environmental Data'}
               </h2>
               <button 
                 onClick={() => setIsEnvDataModalOpen(false)}
