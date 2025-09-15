@@ -1,17 +1,67 @@
 // src/app/(admin)/admin-dashboard/page.tsx
-import type { Metadata } from "next";
-import React from "react";
+"use client";
+import React, { useState, useEffect } from "react";
 import EventsMap from "@/components/maps/EventsMap";
 import RecentEvents from "@/components/events/RecentEvents";
 import { EcommerceMetrics } from "@/components/ecommerce/EcommerceMetrics";
 import Link from "next/link";
-
-export const metadata: Metadata = {
-  title: "Admin Dashboard - Event Management System",
-  description: "Manage events and users in your system",
-};
+import { aboutApi, AboutDto } from "@/lib/api";
 
 export default function AdminDashboard() {
+  // About Us management state
+  const [isAboutUsModalOpen, setIsAboutUsModalOpen] = useState(false);
+  const [title, setTitle] = useState('');
+  const [content, setContent] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  // Fetch About Us data when modal opens
+  const handleOpenAboutModal = async () => {
+    setIsAboutUsModalOpen(true);
+    setError(null);
+    setSuccessMessage(null);
+    
+    try {
+      setIsLoading(true);
+      const data = await aboutApi.getAbout();
+      if (data) {
+        setTitle(data.title || '');
+        setContent(data.content || '');
+      }
+    } catch (err) {
+      console.error("Failed to fetch about data:", err);
+      setError("Failed to load about information. Please try again later.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Save About Us content
+  const handleSaveAbout = async () => {
+    try {
+      setIsSaving(true);
+      setError(null);
+      setSuccessMessage(null);
+      
+      await aboutApi.createOrUpdateAbout(title, content);
+      setSuccessMessage('About Us information has been updated successfully.');
+      
+      // Keep modal open to show success message
+      setTimeout(() => {
+        if (successMessage) {
+          setIsAboutUsModalOpen(false);
+        }
+      }, 2000);
+    } catch (err) {
+      console.error("Failed to update about data:", err);
+      setError("Failed to save about information. Please try again later.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   return (
     <div className="grid grid-cols-12 gap-4 md:gap-6">
       {/* Admin Header with Action Buttons */}
@@ -111,6 +161,22 @@ export default function AdminDashboard() {
                 <p className="text-sm text-gray-500 dark:text-gray-400">View and manage user accounts</p>
               </div>
             </Link>
+            
+            {/* New About Us Management Button */}
+            <button 
+              onClick={handleOpenAboutModal}
+              className="flex w-full items-center p-3 rounded-lg border border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-900/30 transition-colors"
+            >
+              <div className="bg-purple-100 dark:bg-purple-900/30 p-2 rounded-lg mr-3">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-purple-600 dark:text-purple-400" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="text-left">
+                <h4 className="font-medium text-gray-800 dark:text-white">Manage About Us</h4>
+                <p className="text-sm text-gray-500 dark:text-gray-400">Update your about us content</p>
+              </div>
+            </button>
           </div>
         </div>
       </div>
@@ -119,6 +185,101 @@ export default function AdminDashboard() {
       <div className="col-span-12 md:col-span-8">
         <RecentEvents />
       </div>
+
+      {/* About Us Modal */}
+      {isAboutUsModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg w-full max-w-3xl mx-4 max-h-[90vh] overflow-auto">
+            <div className="p-5 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
+              <h3 className="text-xl font-semibold text-gray-800 dark:text-white">Manage About Us Content</h3>
+              <button 
+                onClick={() => setIsAboutUsModalOpen(false)}
+                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-white"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="p-5">
+              {isLoading ? (
+                <div className="flex items-center justify-center p-12">
+                  <div className="h-8 w-8 animate-spin rounded-full border-4 border-gray-300 border-t-brand-500"></div>
+                  <span className="ml-2 text-gray-600 dark:text-gray-400">Loading...</span>
+                </div>
+              ) : (
+                <>
+                  {error && (
+                    <div className="mb-4 rounded-lg bg-red-50 p-4 text-red-500 dark:bg-red-900/20 dark:text-red-400">
+                      {error}
+                    </div>
+                  )}
+                  
+                  {successMessage && (
+                    <div className="mb-4 rounded-lg bg-green-50 p-4 text-green-500 dark:bg-green-900/20 dark:text-green-400">
+                      {successMessage}
+                    </div>
+                  )}
+
+                  <div className="mb-4">
+                    <label htmlFor="title" className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Title
+                    </label>
+                    <input
+                      type="text"
+                      id="title"
+                      value={title}
+                      onChange={(e) => setTitle(e.target.value)}
+                      className="block w-full rounded-lg border border-gray-300 bg-white p-2.5 text-gray-900 focus:border-brand-500 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 dark:focus:border-brand-500 dark:focus:ring-brand-500"
+                      placeholder="About Us Title"
+                      required
+                    />
+                  </div>
+
+                  <div className="mb-4">
+                    <label htmlFor="content" className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Content (HTML supported)
+                    </label>
+                    <textarea
+                      id="content"
+                      value={content}
+                      onChange={(e) => setContent(e.target.value)}
+                      className="block h-64 w-full rounded-lg border border-gray-300 bg-white p-2.5 text-gray-900 focus:border-brand-500 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 dark:focus:border-brand-500 dark:focus:ring-brand-500"
+                      placeholder="Enter about us content here..."
+                      required
+                    ></textarea>
+                  </div>
+                </>
+              )}
+            </div>
+
+            <div className="p-5 border-t border-gray-200 dark:border-gray-700 flex justify-end space-x-3">
+              <button
+                onClick={() => setIsAboutUsModalOpen(false)}
+                className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-gray-600"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveAbout}
+                disabled={isSaving || isLoading}
+                className="px-4 py-2 bg-brand-500 text-white rounded-lg hover:bg-brand-600 disabled:opacity-70 flex items-center"
+              >
+                {isSaving ? (
+                  <>
+                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Saving...
+                  </>
+                ) : "Save Changes"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
