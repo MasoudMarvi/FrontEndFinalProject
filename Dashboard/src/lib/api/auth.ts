@@ -5,7 +5,7 @@ export async function login(data: LoginCommand): Promise<AuthResponse> {
   try {
     const res = await api.post<AuthResponse>('/Auth/login', data);
     // Store the token in local storage or a cookie
-    const { accessToken, refreshToken, userId, email, roles, fullName } = res.data;
+    const { accessToken, refreshToken, userId, email, roles, fullName, profilePictureUrl } = res.data;
 
     // Store tokens in localStorage
     localStorage.setItem('accessToken', accessToken);
@@ -14,8 +14,13 @@ export async function login(data: LoginCommand): Promise<AuthResponse> {
     localStorage.setItem('email', email);
     localStorage.setItem('fullName', fullName);
     localStorage.setItem('roles', JSON.stringify(roles));
+    
+    // Store profile picture URL if available
+    if (profilePictureUrl) {
+      localStorage.setItem('profilePictureUrl', profilePictureUrl);
+    }
+    
     return res.data;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } catch (err: any) {
     throw new Error(err.response?.data?.message || 'Login failed');
   }
@@ -25,15 +30,20 @@ export async function refreshToken(data: RefreshTokenRequest): Promise<AuthRespo
   try {
     const res = await api.post<AuthResponse>('/Auth/refresh-token', data);
     // Update stored tokens
-    const { accessToken, refreshToken, userId, email, roles, fullName } = res.data;
+    const { accessToken, refreshToken, userId, email, roles, fullName, profilePictureUrl } = res.data;
     localStorage.setItem('accessToken', accessToken);
     localStorage.setItem('refreshToken', refreshToken);
     localStorage.setItem('userId', userId);
     localStorage.setItem('email', email);
     localStorage.setItem('fullName', fullName);
     localStorage.setItem('roles', JSON.stringify(roles));
+    
+    // Update profile picture URL if available
+    if (profilePictureUrl) {
+      localStorage.setItem('profilePictureUrl', profilePictureUrl);
+    }
+    
     return res.data;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } catch (err: any) {
     throw new Error(err.response?.data?.message || 'Token refresh failed');
   }
@@ -46,4 +56,5 @@ export function logout(): void {
   localStorage.removeItem('email');
   localStorage.removeItem('fullName');
   localStorage.removeItem('roles');
+  localStorage.removeItem('profilePictureUrl'); 
 }

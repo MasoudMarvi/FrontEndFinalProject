@@ -173,6 +173,8 @@ export interface AuthResponse {
   email: string;
   fullName: string;
   roles: string[];
+  profilePictureUrl?: string; 
+
 }
 
 export interface RegisterResponse {
