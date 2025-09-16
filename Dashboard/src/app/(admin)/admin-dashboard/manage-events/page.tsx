@@ -49,6 +49,9 @@ interface ExtendedEventData extends EventDto {
   picture1?: string;
   picture2?: string;
   picture3?: string;
+  picture1File?: File; // Added for file upload
+  picture2File?: File; // Added for file upload
+  picture3File?: File; // Added for file upload
 }
 
 // Default image for events with no images
@@ -56,6 +59,30 @@ const DEFAULT_IMAGE = "/images/event/event-default.jpg";
 
 // Base URL for event images
 const IMAGE_BASE_URL = 'https://localhost:7235/uploads/events/';
+
+// Function to update event with images using FormData
+const updateEventWithImages = async (eventId: string, formData: FormData): Promise<EventDto> => {
+  try {
+    const token = localStorage.getItem('accessToken');
+    const response = await fetch(`https://localhost:7235/api/Events/${eventId}`, {
+      method: 'PUT',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || 'Failed to update event');
+    }
+
+    return await response.json();
+  } catch (err: any) {
+    console.error('Error in updateEventWithImages:', err);
+    throw new Error(err.message || 'Failed to update event');
+  }
+};
 
 // Map component
 const MapComponent = ({ 
@@ -109,6 +136,8 @@ const MapComponent = ({
 // Helper function to get image URL from backend path
 function getImageUrl(imagePath: string | null | undefined): string {
   if (!imagePath) return DEFAULT_IMAGE;
+  // If it's already a data URL (from file input preview), return it as is
+  if (imagePath.startsWith('data:')) return imagePath;
   // Clean up the path to avoid duplication
   const cleanPath = imagePath.replace(/^\/uploads\/events\//, '');
   return cleanPath ? `${IMAGE_BASE_URL}${cleanPath}` : DEFAULT_IMAGE;
@@ -122,17 +151,13 @@ export default function ManageEvents() {
   const [isEnvDataModalOpen, setIsEnvDataModalOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<ExtendedEventData | null>(null);
   const [editingEnvData, setEditingEnvData] = useState<EnvironmentalData | null>(null);
-  const [newImageFiles, setNewImageFiles] = useState<File[]>([]);
   const [categories, setCategories] = useState<EventCategoryDto[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const [startDate, setStartDate] = useState<string>('');
   const [startTime, setStartTime] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
   const [endTime, setEndTime] = useState<string>('');
-  const [imageUrls, setImageUrls] = useState<string[]>([]);
-  const [removedImageIndexes, setRemovedImageIndexes] = useState<number[]>([]);
   const [isRefreshingData, setIsRefreshingData] = useState(false);
   const [envDataLoading, setEnvDataLoading] = useState(false);
   
@@ -227,16 +252,6 @@ export default function ManageEvents() {
       setEndDate(endDateTime.toISOString().split('T')[0]);
       setEndTime(endDateTime.toTimeString().substring(0, 5));
       
-      // Initialize image URLs from event pictures
-      const images: string[] = [];
-      if (event.picture1) images.push(getImageUrl(event.picture1));
-      if (event.picture2) images.push(getImageUrl(event.picture2));
-      if (event.picture3) images.push(getImageUrl(event.picture3));
-      
-      setImageUrls(images);
-      setNewImageFiles([]);
-      setRemovedImageIndexes([]);
-      
       // Fetch environmental data for this event
       setEnvDataLoading(true);
       try {
@@ -313,34 +328,60 @@ export default function ManageEvents() {
       const startDateTime = new Date(`${startDate}T${startTime}`);
       const endDateTime = new Date(`${endDate}T${endTime}`);
 
-      // Create the update command
+      // Create form data to handle image uploads
+      const formData = new FormData();
+      
+      // Add all non-file fields
+      formData.append('eventId', editingEvent.eventId);
+      formData.append('title', editingEvent.title || '');
+      formData.append('description', editingEvent.description || '');
+      formData.append('latitude', editingEvent.location.lat.toString());
+      formData.append('longitude', editingEvent.location.lng.toString());
+      formData.append('startDateTime', startDateTime.toISOString());
+      formData.append('endDateTime', endDateTime.toISOString());
+      formData.append('categoryId', editingEvent.categoryId);
+      formData.append('isPublic', editingEvent.isPublic.toString());
+      formData.append('status', editingEvent.status.toString());
+
+      // Add image files if they exist (new uploads)
+      if (editingEvent.picture1File) {
+        formData.append('Picture1', editingEvent.picture1File);
+      }
+      
+      if (editingEvent.picture2File) {
+        formData.append('Picture2', editingEvent.picture2File);
+      }
+      
+      if (editingEvent.picture3File) {
+        formData.append('Picture3', editingEvent.picture3File);
+      }
+
+      // Create the update command (for non-file data)
       const updateCommand: UpdateEventCommand = {
         eventId: editingEvent.eventId,
-        title: editingEvent.title,
-        description: editingEvent.description,
-        latitude: editingEvent.latitude,
-        longitude: editingEvent.longitude,
+        title: editingEvent.title || '',
+        description: editingEvent.description || '',
+        latitude: editingEvent.location.lat,
+        longitude: editingEvent.location.lng,
         startDateTime: startDateTime.toISOString(),
         endDateTime: endDateTime.toISOString(),
         categoryId: editingEvent.categoryId,
         isPublic: editingEvent.isPublic,
         status: editingEvent.status || EventStatus.Active
-        // Note: We don't send images or environmental data here - those are handled separately
       };
 
-      await updateEvent(editingEvent.eventId, updateCommand);
-      
-      // Handle image uploads if needed - this would be implemented in a real app
-      // For now we're just simulating that the images were updated
+      // Update event using formData if there are image files, otherwise use updateCommand
+      if (editingEvent.picture1File || editingEvent.picture2File || editingEvent.picture3File) {
+        await updateEventWithImages(editingEvent.eventId, formData);
+      } else {
+        await updateEvent(editingEvent.eventId, updateCommand);
+      }
       
       // Close modal and refresh data
       setIsEditModalOpen(false);
       
       // Reset state
       setEditingEvent(null);
-      setNewImageFiles([]);
-      setImageUrls([]);
-      setRemovedImageIndexes([]);
       
       // Refresh the events list
       setIsRefreshingData(prev => !prev);
@@ -348,28 +389,6 @@ export default function ManageEvents() {
     } catch (err) {
       console.error('Error updating event:', err);
       alert('Failed to update event. Please try again.');
-    }
-  };
-  
-  // Handle file upload
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      const filesArray = Array.from(e.target.files);
-      
-      // Calculate how many more images we can add
-      const currentImages = imageUrls.length - removedImageIndexes.length;
-      const maxAdditionalImages = 3 - currentImages;
-      
-      if (filesArray.length > maxAdditionalImages) {
-        alert(`You can only add ${maxAdditionalImages} more image${maxAdditionalImages !== 1 ? 's' : ''}. The total limit is 3 images per event.`);
-        // Take only the allowed number of files
-        setNewImageFiles(prev => [...prev, ...filesArray.slice(0, maxAdditionalImages)]);
-      } else {
-        setNewImageFiles(prev => [...prev, ...filesArray]);
-      }
-      
-      // Reset the input value to allow selecting the same file again
-      e.target.value = '';
     }
   };
 
@@ -776,7 +795,7 @@ export default function ManageEvents() {
         </div>
       </div>
       
-      {/* Edit Event Modal */}
+      {/* Edit Event Modal - Updated with the three-image upload functionality */}
       {isEditModalOpen && editingEvent && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 overflow-y-auto">
           <div className="bg-white dark:bg-gray-800 rounded-lg w-full max-w-3xl max-h-[90vh] overflow-y-auto p-6 m-4">
@@ -823,86 +842,235 @@ export default function ManageEvents() {
                 ></textarea>
               </div>
               
-              {/* Image Management - Updated to handle 3 images directly in the edit modal */}
+              {/* Image Management - Updated to match CreateEventForm with 3 specific image slots */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Event Images (Up to 3)
                 </label>
                 
-                {/* Display existing images with remove option */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
-                  {imageUrls.map((url, index) => (
-                    !removedImageIndexes.includes(index) && (
-                      <div key={index} className="relative">
-                        <img 
-                          src={url} 
-                          alt={`Event image ${index + 1}`} 
-                          className="w-full h-40 object-cover rounded-lg border border-gray-200 dark:border-gray-700"
-                          onError={(e) => {
-                            // Fallback to default image
-                            (e.target as HTMLImageElement).src = DEFAULT_IMAGE;
-                          }}
-                        />
+                <div className="mt-1 grid grid-cols-1 gap-4 sm:grid-cols-3">
+                  {/* Image Slot 1 */}
+                  <div className="relative">
+                    {editingEvent.picture1 ? (
+                      <div className="relative w-full">
+                        <div className="relative h-48 w-full rounded-lg overflow-hidden">
+                          <Image
+                            src={getImageUrl(editingEvent.picture1)}
+                            alt="Event preview 1"
+                            fill
+                            className="object-cover"
+                            onError={(e) => {
+                              // Fallback to default image
+                              (e.target as HTMLImageElement).src = DEFAULT_IMAGE;
+                            }}
+                          />
+                        </div>
                         <button
                           type="button"
-                          className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1"
-                          onClick={() => setRemovedImageIndexes([...removedImageIndexes, index])}
+                          onClick={() => {
+                            setEditingEvent({
+                              ...editingEvent,
+                              picture1: undefined
+                            });
+                          }}
+                          className="absolute top-2 right-2 bg-gray-800 bg-opacity-70 rounded-full p-1.5 text-white hover:bg-opacity-100"
                         >
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                             <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
                           </svg>
                         </button>
                       </div>
-                    )
-                  ))}
-                  
-                  {/* New Image Previews */}
-                  {newImageFiles.map((file, index) => (
-                    <div key={`new-${index}`} className="relative">
-                      <img 
-                        src={URL.createObjectURL(file)} 
-                        alt={`New event image ${index + 1}`} 
-                        className="w-full h-40 object-cover rounded-lg border border-gray-200 dark:border-gray-700"
-                      />
-                      <button
-                        type="button"
-                        className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1"
-                        onClick={() => {
-                          const updatedFiles = [...newImageFiles];
-                          updatedFiles.splice(index, 1);
-                          setNewImageFiles(updatedFiles);
-                        }}
+                    ) : (
+                      <label
+                        htmlFor="eventImage0"
+                        className="flex flex-col items-center justify-center w-full h-48 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-700 hover:bg-gray-100 dark:border-gray-600"
                       >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                          <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                        </svg>
-                      </button>
-                    </div>
-                  ))}
-                  
-                  {/* Add Image Button (only show if less than 3 total images) */}
-                  {(imageUrls.length - removedImageIndexes.length + newImageFiles.length) < 3 && (
-                    <div 
-                      onClick={() => fileInputRef.current?.click()}
-                      className="h-40 flex items-center justify-center border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50"
-                    >
-                      <div className="text-center">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 mx-auto text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                        </svg>
-                        <span className="block mt-1 text-sm text-gray-500">Add Image</span>
+                        <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                          <svg className="w-10 h-10 mb-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                          </svg>
+                          <p className="mb-2 text-sm text-gray-500 dark:text-gray-400 text-center">
+                            <span className="font-semibold">Image 1</span>
+                          </p>
+                        </div>
+                        <input
+                          id="eventImage0"
+                          type="file"
+                          className="hidden"
+                          accept="image/*"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              setEditingEvent({
+                                ...editingEvent,
+                                picture1File: file
+                              });
+                              
+                              // Create a preview
+                              const reader = new FileReader();
+                              reader.onloadend = () => {
+                                setEditingEvent(prev => ({
+                                  ...prev!,
+                                  picture1: reader.result as string
+                                }));
+                              };
+                              reader.readAsDataURL(file);
+                            }
+                          }}
+                        />
+                      </label>
+                    )}
+                  </div>
+
+                  {/* Image Slot 2 */}
+                  <div className="relative">
+                    {editingEvent.picture2 ? (
+                      <div className="relative w-full">
+                        <div className="relative h-48 w-full rounded-lg overflow-hidden">
+                          <Image
+                            src={getImageUrl(editingEvent.picture2)}
+                            alt="Event preview 2"
+                            fill
+                            className="object-cover"
+                            onError={(e) => {
+                              // Fallback to default image
+                              (e.target as HTMLImageElement).src = DEFAULT_IMAGE;
+                            }}
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingEvent({
+                              ...editingEvent,
+                              picture2: undefined
+                            });
+                          }}
+                          className="absolute top-2 right-2 bg-gray-800 bg-opacity-70 rounded-full p-1.5 text-white hover:bg-opacity-100"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                          </svg>
+                        </button>
                       </div>
-                    </div>
-                  )}
+                    ) : (
+                      <label
+                        htmlFor="eventImage1"
+                        className="flex flex-col items-center justify-center w-full h-48 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-700 hover:bg-gray-100 dark:border-gray-600"
+                      >
+                        <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                          <svg className="w-10 h-10 mb-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                          </svg>
+                          <p className="mb-2 text-sm text-gray-500 dark:text-gray-400 text-center">
+                            <span className="font-semibold">Image 2</span>
+                          </p>
+                        </div>
+                        <input
+                          id="eventImage1"
+                          type="file"
+                          className="hidden"
+                          accept="image/*"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              setEditingEvent({
+                                ...editingEvent,
+                                picture2File: file
+                              });
+                              
+                              // Create a preview
+                              const reader = new FileReader();
+                              reader.onloadend = () => {
+                                setEditingEvent(prev => ({
+                                  ...prev!,
+                                  picture2: reader.result as string
+                                }));
+                              };
+                              reader.readAsDataURL(file);
+                            }
+                          }}
+                        />
+                      </label>
+                    )}
+                  </div>
+
+                  {/* Image Slot 3 */}
+                  <div className="relative">
+                    {editingEvent.picture3 ? (
+                      <div className="relative w-full">
+                        <div className="relative h-48 w-full rounded-lg overflow-hidden">
+                          <Image
+                            src={getImageUrl(editingEvent.picture3)}
+                            alt="Event preview 3"
+                            fill
+                            className="object-cover"
+                            onError={(e) => {
+                              // Fallback to default image
+                              (e.target as HTMLImageElement).src = DEFAULT_IMAGE;
+                            }}
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingEvent({
+                              ...editingEvent,
+                              picture3: undefined
+                            });
+                          }}
+                          className="absolute top-2 right-2 bg-gray-800 bg-opacity-70 rounded-full p-1.5 text-white hover:bg-opacity-100"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                          </svg>
+                        </button>
+                      </div>
+                    ) : (
+                      <label
+                        htmlFor="eventImage2"
+                        className="flex flex-col items-center justify-center w-full h-48 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-700 hover:bg-gray-100 dark:border-gray-600"
+                      >
+                        <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                          <svg className="w-10 h-10 mb-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                          </svg>
+                          <p className="mb-2 text-sm text-gray-500 dark:text-gray-400 text-center">
+                            <span className="font-semibold">Image 3</span>
+                          </p>
+                        </div>
+                        <input
+                          id="eventImage2"
+                          type="file"
+                          className="hidden"
+                          accept="image/*"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              setEditingEvent({
+                                ...editingEvent,
+                                picture3File: file
+                              });
+                              
+                              // Create a preview
+                              const reader = new FileReader();
+                              reader.onloadend = () => {
+                                setEditingEvent(prev => ({
+                                  ...prev!,
+                                  picture3: reader.result as string
+                                }));
+                              };
+                              reader.readAsDataURL(file);
+                            }
+                          }}
+                        />
+                      </label>
+                    )}
+                  </div>
                 </div>
-                
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  ref={fileInputRef}
-                  onChange={handleFileChange}
-                />
+                <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                  SVG, PNG, JPG or GIF (Max. 2MB per image)
+                </p>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
