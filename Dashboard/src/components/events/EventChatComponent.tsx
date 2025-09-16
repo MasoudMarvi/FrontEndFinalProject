@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { getEventById } from '@/lib/api/events';
 import { getChatMessagesByEvent, createChatMessage } from '@/lib/api/chatMessages';
 import { ChatMessageDto, EventDetailDto, CreateChatMessageCommand } from '@/lib/api/types';
+import * as signalR from "@microsoft/signalr";
 
 interface EventChatComponentProps {
   eventId: string;
@@ -23,6 +24,36 @@ const EventChatComponent = ({ eventId }: EventChatComponentProps) => {
   const [isClient, setIsClient] = useState(false);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const [connection, setConnection] = useState<signalR.HubConnection | null>(null);
+useEffect(() => {
+  if (!eventId || !currentUser) return;
+
+  const connect = new signalR.HubConnectionBuilder()
+    .withUrl("https://localhost:7235/chathub") // آدرس API
+    .withAutomaticReconnect()
+    .configureLogging(signalR.LogLevel.Information)
+    .build();
+
+  // وقتی پیام جدید رسید
+  connect.on("ReceiveMessage", (message: ChatMessageDto) => {
+    setMessages(prev => [...prev, message]);
+  });
+
+  connect.start()
+    .then(() => {
+      console.log("SignalR Connected ✅");
+      // جوین به گروه ایونت
+      connect.invoke("JoinEvent", eventId);
+    })
+    .catch(err => console.error("SignalR error: ", err));
+
+  setConnection(connect);
+
+  return () => {
+    connect.stop();
+  };
+}, [eventId, currentUser]);
   
   // First, set isClient to true when component mounts
   useEffect(() => {
@@ -103,21 +134,31 @@ const EventChatComponent = ({ eventId }: EventChatComponentProps) => {
   // Handle form submission to send a new message
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMessage.trim() || !eventId) return;
+    // if (!newMessage.trim() || !eventId) return;
+      if (!newMessage.trim() || !eventId || !connection || !currentUser) return;
+
     
     try {
       // Create message data
-      const messageData: CreateChatMessageCommand = {
-        eventId: eventId,
-        messageText: newMessage.trim()
-      };
+      // const messageData: CreateChatMessageCommand = {
+      //   eventId: eventId,
+      //   messageText: newMessage.trim()
+      // };
       
-      // Send to backend
-      const createdMessage = await createChatMessage(messageData);
+      // // Send to backend
+      // const createdMessage = await createChatMessage(messageData);
       
-      // Add to messages
-      setMessages(prevMessages => [...prevMessages, createdMessage]);
-      setNewMessage('');
+      // // Add to messages
+      // setMessages(prevMessages => [...prevMessages, createdMessage]);
+      // setNewMessage('');
+       await connection.invoke(
+      "SendMessage",
+      eventId,
+      currentUser.userId,
+      newMessage.trim()
+    );
+
+    setNewMessage('');
     } catch (err: any) {
       console.error('Error sending message:', err);
       
