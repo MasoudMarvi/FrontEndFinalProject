@@ -40,18 +40,36 @@ export async function changePassword(data: {
   }
 }
 
-// Update user profile image
+// Update the updateProfileImage function in users.ts
 export async function updateProfileImage(userId: string, imageFile: File): Promise<void> {
   try {
     const formData = new FormData();
-    formData.append('image', imageFile);
-    formData.append('userId', userId);
+    formData.append('ProfilePicture', imageFile);
+    formData.append('UserId', userId);
     
-    await api.post('/Users/UpdateProfileImage', formData, {
+    // Get current user data to keep it intact
+    const email = localStorage.getItem('email') || '';
+    const fullName = localStorage.getItem('fullName') || '';
+    const roles = JSON.parse(localStorage.getItem('roles') || '["User"]');
+    
+    formData.append('Email', email);
+    formData.append('FullName', fullName);
+    formData.append('Role', roles[0]);
+    
+    const response = await api.put('/Users/UpdateUser', formData, {
       headers: {
         'Content-Type': 'multipart/form-data'
       }
     });
+    
+    // If the response includes a profile picture URL, update localStorage
+    if (response.data && response.data.profilePictureUrl) {
+      localStorage.setItem('profilePictureUrl', response.data.profilePictureUrl);
+    } else {
+      // If not, use a URL pattern based on the user ID with a timestamp to avoid caching
+      const profilePictureUrl = `https://localhost:7235/uploads/users/${userId}.jpg?t=${Date.now()}`;
+      localStorage.setItem('profilePictureUrl', profilePictureUrl);
+    }
   } catch (err: any) {
     throw new Error(err.response?.data?.message || 'Profile image update failed');
   }

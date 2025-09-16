@@ -1,5 +1,4 @@
 "use client";
-import Image from "next/image";
 import Link from "next/link";
 import React, { useState, useEffect } from "react";
 import { Dropdown } from "../ui/dropdown/Dropdown";
@@ -13,17 +12,29 @@ export default function UserDropdown() {
     fullName: "",
     email: "",
   });
+  const [profileImage, setProfileImage] = useState("/images/user/NoImage.jpeg"); // Default image
   const router = useRouter();
 
   useEffect(() => {
     // Get user data from localStorage
     const fullName = localStorage.getItem('fullName') || "";
     const email = localStorage.getItem('email') || "";
+    const profilePictureUrl = localStorage.getItem('profilePictureUrl');
     
     setUserData({
       fullName,
       email,
     });
+    
+    // If profile picture URL exists in localStorage, use it
+    if (profilePictureUrl) {
+      // Check if it's a relative URL and handle appropriately
+      if (profilePictureUrl.startsWith('/')) {
+        setProfileImage(`https://localhost:7235${profilePictureUrl}`);
+      } else {
+        setProfileImage(profilePictureUrl);
+      }
+    }
   }, []);
 
   function toggleDropdown(e: React.MouseEvent<HTMLButtonElement, MouseEvent>) {
@@ -50,11 +61,15 @@ export default function UserDropdown() {
         className="flex items-center text-gray-700 dark:text-gray-400 dropdown-toggle"
       >
         <span className="mr-3 overflow-hidden rounded-full h-11 w-11">
-          <Image
-            width={44}
-            height={44}
-            src="/images/user/HosseinMarvi.jpg" // Default image path
-            alt="User"
+          {/* Using regular img tag instead of Next.js Image */}
+          <img
+            src={profileImage}
+            alt={userData.fullName || "User"}
+            className="w-full h-full object-cover"
+            onError={() => {
+              console.log("Error loading profile image in dropdown, using default");
+              setProfileImage("/images/user/user-01.jpg");
+            }}
           />
         </span>
 
