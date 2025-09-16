@@ -68,7 +68,7 @@ export default function UserDropdown() {
             className="w-full h-full object-cover"
             onError={() => {
               console.log("Error loading profile image in dropdown, using default");
-              setProfileImage("/images/user/user-01.jpg");
+              setProfileImage("/images/user/NoImage.jpeg");
             }}
           />
         </span>
