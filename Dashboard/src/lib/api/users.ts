@@ -27,19 +27,48 @@ export async function getCurrentUser(): Promise<UserProfile> {
   }
 }
 
-// Update user password
-export async function changePassword(data: {
-  userId: string;
-  currentPassword: string;
-  newPassword: string;
-}): Promise<void> {
+// Update the changePassword function in users.ts
+export async function changePassword(
+  userId: string,
+  currentPassword: string,
+  newPassword: string,
+  confirmPassword: string
+): Promise<{success: boolean; message: string}> {
   try {
-    await api.post('/Users/ChangePassword', data);
+    // Create FormData for the multipart/form-data request
+    const formData = new FormData();
+    formData.append('UserId', userId);
+    formData.append('CurrentPassword', currentPassword);
+    formData.append('NewPassword', newPassword);
+    formData.append('ConfirmPassword', confirmPassword);
+    
+    // Make the API request
+    const response = await api.put('/Users/ChangePassword', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    });
+    
+    return {
+      success: true,
+      message: 'Password changed successfully'
+    };
   } catch (err: any) {
-    throw new Error(err.response?.data?.message || 'Password change failed');
+    // Handle error responses
+    let errorMessage = 'Password change failed';
+    
+    if (err.response) {
+      // Get detailed error message if available
+      errorMessage = err.response.data?.message || 
+                     err.response.data?.title || 
+                     `Error: ${err.response.status} ${err.response.statusText}`;
+    } else if (err.message) {
+      errorMessage = err.message;
+    }
+    
+    throw new Error(errorMessage);
   }
 }
-
 // Update the updateProfileImage function in users.ts
 export async function updateProfileImage(userId: string, imageFile: File): Promise<void> {
   try {

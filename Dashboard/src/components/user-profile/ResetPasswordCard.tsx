@@ -5,9 +5,11 @@ import { Modal } from "../ui/modal";
 import Button from "../ui/button/Button";
 import Input from "../form/input/InputField";
 import Label from "../form/Label";
+import { usersApi } from "@/lib/api";
 
 export default function ResetPasswordCard() {
   const { isOpen, openModal, closeModal } = useModal();
+  const [isLoading, setIsLoading] = useState(false);
   
   // Form state
   const [formData, setFormData] = useState({
@@ -44,15 +46,23 @@ export default function ResetPasswordCard() {
       return;
     }
     
+    setIsLoading(true);
     try {
-      // In a real implementation, you would call an API to change the password
-      // Example:
-      // await axios.post('/api/users/change-password', {
-      //   currentPassword: formData.currentPassword,
-      //   newPassword: formData.newPassword
-      // });
+      // Get userId from localStorage
+      const userId = localStorage.getItem('userId');
+      if (!userId) {
+        throw new Error("User ID not found. Please log in again.");
+      }
       
-      // For now, just show success message
+      // Call the API to change password
+      await usersApi.changePassword(
+        userId,
+        formData.currentPassword,
+        formData.newPassword,
+        formData.confirmPassword
+      );
+      
+      // Show success message
       setSuccess("Password changed successfully");
       
       // Reset form
@@ -67,9 +77,11 @@ export default function ResetPasswordCard() {
         closeModal();
         setSuccess(null);
       }, 2000);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error changing password:", err);
-      setError("Failed to change password. Please try again.");
+      setError(err.message || "Failed to change password. Please try again.");
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -114,7 +126,7 @@ export default function ResetPasswordCard() {
               Update your password to keep your account secure.
             </p>
           </div>
-          <form className="flex flex-col">
+          <form className="flex flex-col" onSubmit={(e) => { e.preventDefault(); handleSave(); }}>
             {error && (
               <div className="mb-4 px-2 py-3 bg-error-50 text-error-600 rounded-lg dark:bg-error-900/30 dark:text-error-400">
                 {error}
@@ -161,11 +173,25 @@ export default function ResetPasswordCard() {
               </div>
             </div>
             <div className="flex items-center gap-3 px-2 mt-6 lg:justify-end">
-              <Button size="sm" variant="outline" onClick={closeModal}>
+              <Button 
+                size="sm" 
+                variant="outline" 
+                onClick={closeModal}
+                type="button"
+              >
                 Cancel
               </Button>
-              <Button size="sm" onClick={handleSave}>
-                Update Password
+              <Button 
+                size="sm" 
+                type="submit"
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <div className="flex items-center">
+                    <div className="w-4 h-4 mr-2 border-2 border-t-transparent border-white rounded-full animate-spin"></div>
+                    <span>Processing...</span>
+                  </div>
+                ) : "Update Password"}
               </Button>
             </div>
           </form>
