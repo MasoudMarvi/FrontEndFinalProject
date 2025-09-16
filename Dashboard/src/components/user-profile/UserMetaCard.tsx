@@ -14,7 +14,7 @@ export default function UserMetaCard() {
   const [isLoading, setIsLoading] = useState(false);
   
   // Default profile image path
-  const DEFAULT_PROFILE_IMAGE = "/images/user/user-01.jpg";
+  const DEFAULT_PROFILE_IMAGE = "/images/user/NoImage.jpeg";
   // API base URL
   const API_BASE_URL = "https://localhost:7235";
   
