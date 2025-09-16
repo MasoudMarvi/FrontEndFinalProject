@@ -77,13 +77,13 @@ export async function createEvent(eventData: EventFormData): Promise<EventDto> {
   }
 }
 
-export async function updateEvent(eventId: string, eventData: EventFormData): Promise<EventDto> {
+export async function updateEvent(eventData: EventFormData): Promise<EventDto> {
   try {
     // Convert to FormData for multipart/form-data request
     const formData = new FormData();
     
     // Add all non-file fields
-    formData.append('EventId', eventId);
+    formData.append('EventId', eventData.eventId!); // eventId is required for updates
     formData.append('Title', eventData.title);
     formData.append('Description', eventData.description || '');
     formData.append('Latitude', eventData.latitude.toString());

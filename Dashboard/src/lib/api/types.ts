@@ -133,6 +133,7 @@ export interface EventDetailDto extends EventDto {
 
 // Form data for multipart/form-data requests
 export interface EventFormData {
+  eventId?: string; // Added eventId for updates
   title: string;
   description: string;
   latitude: number;

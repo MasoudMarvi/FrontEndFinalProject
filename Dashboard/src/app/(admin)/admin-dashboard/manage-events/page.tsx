@@ -8,15 +8,13 @@ import { GoogleMap, Marker } from '@react-google-maps/api';
 import { useGoogleMaps } from '@/context/GoogleMapsContext';
 import { getEvents, getEventById, updateEvent, deleteEvent } from '@/lib/api/events';
 import { getEventCategories } from '@/lib/api/eventCategories';
-import { 
-  EventDto, 
-  EventDetailDto, 
-  EventCategoryDto, 
-  UpdateEventCommand,
+import {
+  EventDto,
+  EventDetailDto,
+  EventCategoryDto,
   EventStatus
 } from '@/lib/api/types';
-import { 
-  getEnvironmentalDataByEventId, 
+import {
   createEnvironmentalData,
   updateEnvironmentalData,
   deleteEnvironmentalData
@@ -46,12 +44,10 @@ interface ExtendedEventData extends EventDto {
   time: string;
   hasEnvironmentalData: boolean;
   organizer: string;
-  picture1?: string;
-  picture2?: string;
-  picture3?: string;
-  picture1File?: File; // Added for file upload
-  picture2File?: File; // Added for file upload
-  picture3File?: File; // Added for file upload
+  // For image uploads
+  picture1File?: File | null;
+  picture2File?: File | null;
+  picture3File?: File | null;
 }
 
 // Default image for events with no images
@@ -60,37 +56,14 @@ const DEFAULT_IMAGE = "/images/event/event-default.jpg";
 // Base URL for event images
 const IMAGE_BASE_URL = 'https://localhost:7235/uploads/events/';
 
-// Function to update event with images using FormData
-const updateEventWithImages = async (eventId: string, formData: FormData): Promise<EventDto> => {
-  try {
-    const token = localStorage.getItem('accessToken');
-    const response = await fetch(`https://localhost:7235/api/Events/${eventId}`, {
-      method: 'PUT',
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-      body: formData,
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.message || 'Failed to update event');
-    }
-
-    return await response.json();
-  } catch (err: any) {
-    console.error('Error in updateEventWithImages:', err);
-    throw new Error(err.message || 'Failed to update event');
-  }
-};
 
 // Map component
-const MapComponent = ({ 
-  location, 
-  onLocationChange 
-}: { 
-  location: { lat: number; lng: number }, 
-  onLocationChange: (lat: number, lng: number) => void 
+const MapComponent = ({
+  location,
+  onLocationChange
+}: {
+  location: { lat: number; lng: number },
+  onLocationChange: (lat: number, lng: number) => void
 }) => {
   const { isLoaded } = useGoogleMaps();
   const [map, setMap] = useState<google.maps.Map | null>(null);
@@ -111,7 +84,7 @@ const MapComponent = ({
     }
   };
 
-  
+
   return isLoaded ? (
     <GoogleMap
       mapContainerStyle={{
@@ -160,21 +133,21 @@ export default function ManageEvents() {
   const [endTime, setEndTime] = useState<string>('');
   const [isRefreshingData, setIsRefreshingData] = useState(false);
   const [envDataLoading, setEnvDataLoading] = useState(false);
-  
+
   // Fetch events and categories on component mount
   useEffect(() => {
     const fetchData = async () => {
       setIsLoading(true);
       setError(null);
-      
+
       try {
         // Fetch categories first
         const categoriesData = await getEventCategories();
         setCategories(categoriesData);
-        
+
         // Then fetch all events (including private ones for admin)
         const eventsData = await getEvents(true);
-        
+
         // Transform events to include UI-specific fields
         const transformedEvents: ExtendedEventData[] = eventsData.map(event => ({
           ...event,
@@ -194,7 +167,7 @@ export default function ManageEvents() {
           ].filter(Boolean) as string[], // Remove null/undefined values
           organizer: event.creatorName || 'Unknown',
         }));
-        
+
         setEvents(transformedEvents);
       } catch (err) {
         console.error('Error fetching data:', err);
@@ -203,14 +176,14 @@ export default function ManageEvents() {
         setIsLoading(false);
       }
     };
-    
+
     fetchData();
   }, [isRefreshingData]);
-  
+
   // Filter events based on category and status
   const filteredEvents = events.filter(event => {
     const matchesCategory = selectedCategory === 'All Categories' || event.categoryName === selectedCategory;
-    
+
     // For status filtering
     let statusMatch = true;
     if (selectedStatus !== 'All Status') {
@@ -222,10 +195,10 @@ export default function ManageEvents() {
         statusMatch = event.status === EventStatus.Cancelled;
       }
     }
-    
+
     return matchesCategory && statusMatch;
   });
-  
+
   // Delete event
   const handleDelete = async (id: string) => {
     if (window.confirm('Are you sure you want to delete this event?')) {
@@ -241,17 +214,17 @@ export default function ManageEvents() {
 
   const handleEdit = async (event: ExtendedEventData) => {
     try {
-      setEditingEvent({...event});
-      
+      setEditingEvent({ ...event });
+
       // Set date and time fields
       const startDateTime = new Date(event.startDateTime);
       const endDateTime = new Date(event.endDateTime);
-      
+
       setStartDate(startDateTime.toISOString().split('T')[0]);
       setStartTime(startDateTime.toTimeString().substring(0, 5));
       setEndDate(endDateTime.toISOString().split('T')[0]);
       setEndTime(endDateTime.toTimeString().substring(0, 5));
-      
+
       // Fetch environmental data for this event
       setEnvDataLoading(true);
       try {
@@ -271,27 +244,27 @@ export default function ManageEvents() {
       } finally {
         setEnvDataLoading(false);
       }
-      
+
       setIsEditModalOpen(true);
     } catch (err) {
       console.error('Error setting up event editing:', err);
       alert('Failed to load event details. Please try again.');
     }
   };
-  
+
   // Handle form field changes
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    
+
     if (!editingEvent) return;
-    
+
     if (name.includes('.')) {
       const [parent, child] = name.split('.');
-      
+
       setEditingEvent({
         ...editingEvent,
         [parent]: {
-          ...editingEvent[parent as keyof typeof editingEvent],
+          ...((editingEvent[parent as keyof typeof editingEvent] || {}) as object),
           [child]: value
         }
       });
@@ -306,7 +279,7 @@ export default function ManageEvents() {
   // Handle location change from map
   const handleLocationChange = (lat: number, lng: number) => {
     if (!editingEvent) return;
-    
+
     setEditingEvent({
       ...editingEvent,
       location: {
@@ -327,37 +300,12 @@ export default function ManageEvents() {
       // Create start and end date-times by combining date and time
       const startDateTime = new Date(`${startDate}T${startTime}`);
       const endDateTime = new Date(`${endDate}T${endTime}`);
-
-      // Create form data to handle image uploads
-      const formData = new FormData();
-      
-      // Add all non-file fields
-      formData.append('eventId', editingEvent.eventId);
-      formData.append('title', editingEvent.title || '');
-      formData.append('description', editingEvent.description || '');
-      formData.append('latitude', editingEvent.location.lat.toString());
-      formData.append('longitude', editingEvent.location.lng.toString());
-      formData.append('startDateTime', startDateTime.toISOString());
-      formData.append('endDateTime', endDateTime.toISOString());
-      formData.append('categoryId', editingEvent.categoryId);
-      formData.append('isPublic', editingEvent.isPublic.toString());
-      formData.append('status', editingEvent.status.toString());
-
-      // Add image files if they exist (new uploads)
-      if (editingEvent.picture1File) {
-        formData.append('Picture1', editingEvent.picture1File);
-      }
-      
-      if (editingEvent.picture2File) {
-        formData.append('Picture2', editingEvent.picture2File);
-      }
-      
-      if (editingEvent.picture3File) {
-        formData.append('Picture3', editingEvent.picture3File);
-      }
-
-      // Create the update command (for non-file data)
-      const updateCommand: UpdateEventCommand = {
+      console.log('Submitting event update with data:', {
+        picture1: editingEvent.picture1File,
+        picture2: editingEvent.picture2File,
+        picture3: editingEvent.picture3File,
+      });
+      const result = await updateEvent({
         eventId: editingEvent.eventId,
         title: editingEvent.title || '',
         description: editingEvent.description || '',
@@ -365,27 +313,23 @@ export default function ManageEvents() {
         longitude: editingEvent.location.lng,
         startDateTime: startDateTime.toISOString(),
         endDateTime: endDateTime.toISOString(),
-        categoryId: editingEvent.categoryId,
         isPublic: editingEvent.isPublic,
-        status: editingEvent.status || EventStatus.Active
-      };
+        categoryId: editingEvent.categoryId,
+        status: editingEvent.status,
+        picture1: editingEvent.picture1File ?? undefined,
+        picture2: editingEvent.picture2File ?? undefined,
+        picture3: editingEvent.picture3File ?? undefined,
+      });
 
-      // Update event using formData if there are image files, otherwise use updateCommand
-      if (editingEvent.picture1File || editingEvent.picture2File || editingEvent.picture3File) {
-        await updateEventWithImages(editingEvent.eventId, formData);
-      } else {
-        await updateEvent(editingEvent.eventId, updateCommand);
-      }
-      
       // Close modal and refresh data
       setIsEditModalOpen(false);
-      
+
       // Reset state
       setEditingEvent(null);
-      
+
       // Refresh the events list
       setIsRefreshingData(prev => !prev);
-      
+
     } catch (err) {
       console.error('Error updating event:', err);
       alert('Failed to update event. Please try again.');
@@ -395,7 +339,7 @@ export default function ManageEvents() {
   // Add new environmental data
   const handleAddEnvironmentalData = () => {
     if (!editingEvent) return;
-    
+
     const newEnvData: EnvironmentalData = {
       id: '', // Empty ID for new records - backend will assign a real ID
       eventId: editingEvent.eventId,
@@ -405,7 +349,7 @@ export default function ManageEvents() {
       timestamp: new Date().toISOString(),
       description: ''
     };
-    
+
     setEditingEnvData(newEnvData);
     setIsEnvDataModalOpen(true);
   };
@@ -413,9 +357,9 @@ export default function ManageEvents() {
   // Handle env data form changes
   const handleEnvDataChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     if (!editingEnvData) return;
-    
+
     const { name, value } = e.target;
-    
+
     setEditingEnvData({
       ...editingEnvData,
       [name]: name === 'value' ? parseFloat(value) : value
@@ -425,32 +369,32 @@ export default function ManageEvents() {
   // Save environmental data
   const handleEnvDataSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!editingEvent || !editingEnvData) return;
-    
+
     try {
       // This is a new API call specifically for environmental data
       if (editingEnvData.id) {
         // Update existing environmental data
-        await updateEnvironmentalData(editingEnvData.id, editingEnvData);
+        await updateEnvironmentalData(editingEnvData);
       } else {
         // Create new environmental data
         await createEnvironmentalData(editingEnvData);
       }
-      
+
       // Fetch updated environmental data
       const updatedEnvData = await getEnvironmentalDataByEventId(editingEvent.eventId);
-      
+
       // Update the editing event with new environmental data
       setEditingEvent({
         ...editingEvent,
         environmentalData: updatedEnvData,
         hasEnvironmentalData: updatedEnvData.length > 0
       });
-      
+
       setIsEnvDataModalOpen(false);
       setEditingEnvData(null);
-      
+
     } catch (error) {
       console.error('Error saving environmental data:', error);
       alert('Failed to save environmental data. Please try again.');
@@ -466,15 +410,15 @@ export default function ManageEvents() {
   // Delete environmental data
   const handleDeleteEnvData = async (id: string) => {
     if (!editingEvent || !editingEvent.environmentalData) return;
-    
+
     if (window.confirm('Are you sure you want to delete this environmental data point?')) {
       try {
         // Call the delete API
         await deleteEnvironmentalData(id);
-        
+
         // Update the local state
         const updatedEnvData = editingEvent.environmentalData.filter(item => item.id !== id);
-        
+
         setEditingEvent({
           ...editingEvent,
           environmentalData: updatedEnvData,
@@ -486,7 +430,7 @@ export default function ManageEvents() {
       }
     }
   };
-  
+
   // Status options based on the EventStatus enum
   const getStatusDisplayName = (status: EventStatus) => {
     switch (status) {
@@ -500,7 +444,7 @@ export default function ManageEvents() {
         return 'Unknown';
     }
   };
-  
+
   const getStatusColorClass = (status: EventStatus) => {
     switch (status) {
       case EventStatus.Active:
@@ -513,10 +457,10 @@ export default function ManageEvents() {
         return 'bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400';
     }
   };
-  
+
   // Create category options array with "All Categories" at the beginning
   const categoryOptions = ['All Categories', ...(categories.map(cat => cat.categoryName || '').filter(Boolean))];
-  
+
   // Status options
   const statuses = ['All Status', 'Active', 'Pending', 'Cancelled'];
   const envDataTypes = ['Air Quality', 'Noise Level', 'Water Quality', 'Temperature', 'Humidity', 'Wind Speed', 'Other'];
@@ -550,7 +494,7 @@ export default function ManageEvents() {
                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
               </svg>
               <p className="mt-4 text-error-500">{error}</p>
-              <button 
+              <button
                 onClick={() => window.location.reload()}
                 className="mt-6 rounded-lg bg-brand-500 px-4 py-2 text-white hover:bg-brand-600"
               >
@@ -566,7 +510,7 @@ export default function ManageEvents() {
   return (
     <>
       <PageBreadCrumb title="Manage Events" page="Admin" />
-      
+
       <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
           <div>
@@ -576,7 +520,7 @@ export default function ManageEvents() {
             </p>
           </div>
           <div>
-            <Link 
+            <Link
               href="/form-elements" // Link to your existing CreateEventForm
               className="px-4 py-2 bg-brand-500 text-white rounded-lg hover:bg-brand-600 flex items-center gap-2"
             >
@@ -587,7 +531,7 @@ export default function ManageEvents() {
             </Link>
           </div>
         </div>
-        
+
         {/* Filters */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
           <div>
@@ -603,7 +547,7 @@ export default function ManageEvents() {
               ))}
             </select>
           </div>
-          
+
           <div>
             <select
               value={selectedStatus}
@@ -618,7 +562,7 @@ export default function ManageEvents() {
             </select>
           </div>
         </div>
-        
+
         {/* Events Table */}
         <div className="overflow-x-auto">
           <table className="w-full min-w-[800px]">
@@ -657,8 +601,8 @@ export default function ManageEvents() {
                     <div className="flex items-center">
                       <div className="h-10 w-10 rounded-lg bg-gray-100 dark:bg-gray-800 flex items-center justify-center mr-3 overflow-hidden">
                         {event.images && event.images.length > 0 ? (
-                          <img 
-                            src={event.images[0]} 
+                          <img
+                            src={event.images[0]}
                             alt={event.title || ''}
                             className="h-10 w-10 object-cover"
                             onError={(e) => {
@@ -680,21 +624,20 @@ export default function ManageEvents() {
                   </td>
                   <td className="py-3 px-4 whitespace-nowrap text-gray-600 dark:text-gray-300">
                     <div className="flex flex-col">
-                     <span>{new Date(event.startDateTime).toLocaleDateString()}</span>
+                      <span>{new Date(event.startDateTime).toLocaleDateString()}</span>
                       <span className="text-xs text-gray-500 dark:text-gray-400">
-                        {new Date(event.startDateTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                        {new Date(event.startDateTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </span>
                     </div>
                   </td>
                   <td className="py-3 px-4 whitespace-nowrap">
-                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                      event.categoryName === 'Music' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
+                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${event.categoryName === 'Music' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
                       event.categoryName === 'Technology' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' :
-                      event.categoryName === 'Food' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
-                      event.categoryName === 'Art' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' :
-                      event.categoryName === 'Sports' ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' :
-                      'bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400'
-                    }`}>
+                        event.categoryName === 'Food' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
+                          event.categoryName === 'Art' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' :
+                            event.categoryName === 'Sports' ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' :
+                              'bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400'
+                      }`}>
                       {event.categoryName || 'Uncategorized'}
                     </span>
                   </td>
@@ -745,7 +688,7 @@ export default function ManageEvents() {
                   </td>
                   <td className="py-3 px-4 whitespace-nowrap text-right">
                     <div className="flex justify-end space-x-2">
-                      <Link 
+                      <Link
                         href={`/events/${event.eventId}`}
                         className="px-2 py-1 text-xs text-gray-600 bg-gray-100 rounded hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
                       >
@@ -770,7 +713,7 @@ export default function ManageEvents() {
             </tbody>
           </table>
         </div>
-        
+
         {/* Empty State */}
         {filteredEvents.length === 0 && (
           <div className="py-8 text-center">
@@ -786,7 +729,7 @@ export default function ManageEvents() {
             </button>
           </div>
         )}
-        
+
         {/* Pagination - simplified since we're loading all events at once */}
         <div className="flex justify-between items-center mt-6">
           <p className="text-sm text-gray-500 dark:text-gray-400">
@@ -794,14 +737,14 @@ export default function ManageEvents() {
           </p>
         </div>
       </div>
-      
+
       {/* Edit Event Modal - Updated with the three-image upload functionality */}
       {isEditModalOpen && editingEvent && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 overflow-y-auto">
           <div className="bg-white dark:bg-gray-800 rounded-lg w-full max-w-3xl max-h-[90vh] overflow-y-auto p-6 m-4">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-lg font-medium text-gray-800 dark:text-white">Edit Event</h2>
-              <button 
+              <button
                 onClick={() => setIsEditModalOpen(false)}
                 className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
               >
@@ -841,13 +784,13 @@ export default function ManageEvents() {
                   className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-gray-700 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300"
                 ></textarea>
               </div>
-              
+
               {/* Image Management - Updated to match CreateEventForm with 3 specific image slots */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Event Images (Up to 3)
                 </label>
-                
+
                 <div className="mt-1 grid grid-cols-1 gap-4 sm:grid-cols-3">
                   {/* Image Slot 1 */}
                   <div className="relative">
@@ -870,7 +813,7 @@ export default function ManageEvents() {
                           onClick={() => {
                             setEditingEvent({
                               ...editingEvent,
-                              picture1: undefined
+                              picture1: null
                             });
                           }}
                           className="absolute top-2 right-2 bg-gray-800 bg-opacity-70 rounded-full p-1.5 text-white hover:bg-opacity-100"
@@ -900,12 +843,13 @@ export default function ManageEvents() {
                           accept="image/*"
                           onChange={(e) => {
                             const file = e.target.files?.[0];
+                            console.log('Selected file for Image 1:', file);
                             if (file) {
                               setEditingEvent({
                                 ...editingEvent,
                                 picture1File: file
                               });
-                              
+
                               // Create a preview
                               const reader = new FileReader();
                               reader.onloadend = () => {
@@ -943,7 +887,7 @@ export default function ManageEvents() {
                           onClick={() => {
                             setEditingEvent({
                               ...editingEvent,
-                              picture2: undefined
+                              picture2: null
                             });
                           }}
                           className="absolute top-2 right-2 bg-gray-800 bg-opacity-70 rounded-full p-1.5 text-white hover:bg-opacity-100"
@@ -973,12 +917,13 @@ export default function ManageEvents() {
                           accept="image/*"
                           onChange={(e) => {
                             const file = e.target.files?.[0];
+                            console.log('Selected file for Image 2:', file);
                             if (file) {
                               setEditingEvent({
                                 ...editingEvent,
                                 picture2File: file
                               });
-                              
+
                               // Create a preview
                               const reader = new FileReader();
                               reader.onloadend = () => {
@@ -1016,7 +961,7 @@ export default function ManageEvents() {
                           onClick={() => {
                             setEditingEvent({
                               ...editingEvent,
-                              picture3: undefined
+                              picture3: null
                             });
                           }}
                           className="absolute top-2 right-2 bg-gray-800 bg-opacity-70 rounded-full p-1.5 text-white hover:bg-opacity-100"
@@ -1046,12 +991,13 @@ export default function ManageEvents() {
                           accept="image/*"
                           onChange={(e) => {
                             const file = e.target.files?.[0];
+                            console.log('Selected file for Image 3:', file);
                             if (file) {
                               setEditingEvent({
                                 ...editingEvent,
                                 picture3File: file
                               });
-                              
+
                               // Create a preview
                               const reader = new FileReader();
                               reader.onloadend = () => {
@@ -1093,7 +1039,7 @@ export default function ManageEvents() {
                     ))}
                   </select>
                 </div>
-                
+
                 <div>
                   <label htmlFor="isPublic" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Visibility
@@ -1115,7 +1061,7 @@ export default function ManageEvents() {
                     <option value="false">Private</option>
                   </select>
                 </div>
-                
+
                 {/* Added Status dropdown */}
                 <div>
                   <label htmlFor="status" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -1157,7 +1103,7 @@ export default function ManageEvents() {
                     className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-gray-700 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300"
                   />
                 </div>
-                
+
                 <div>
                   <label htmlFor="startTime" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Start Time
@@ -1172,7 +1118,7 @@ export default function ManageEvents() {
                     className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-gray-700 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300"
                   />
                 </div>
-                
+
                 <div>
                   <label htmlFor="endDate" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     End Date
@@ -1187,7 +1133,7 @@ export default function ManageEvents() {
                     className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-gray-700 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300"
                   />
                 </div>
-                
+
                 <div>
                   <label htmlFor="endTime" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     End Time
@@ -1230,14 +1176,14 @@ export default function ManageEvents() {
                     Click on the map to set location
                   </span>
                 </div>
-                
+
                 <div className="mb-3 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700">
-                  <MapComponent 
-                    location={editingEvent.location} 
-                    onLocationChange={handleLocationChange} 
+                  <MapComponent
+                    location={editingEvent.location}
+                    onLocationChange={handleLocationChange}
                   />
                 </div>
-                
+
                 <div className="grid grid-cols-3 gap-4">
                   <div>
                     <label htmlFor="locationName" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -1252,7 +1198,7 @@ export default function ManageEvents() {
                       className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-gray-700 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300"
                     />
                   </div>
-                  
+
                   <div>
                     <label htmlFor="latitude" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                       Latitude
@@ -1268,7 +1214,7 @@ export default function ManageEvents() {
                       className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-gray-700 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300"
                     />
                   </div>
-                  
+
                   <div>
                     <label htmlFor="longitude" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                       Longitude
@@ -1286,7 +1232,7 @@ export default function ManageEvents() {
                   </div>
                 </div>
               </div>
-              
+
               {/* Environmental Data Section */}
               <div>
                 <div className="flex justify-between items-center mb-3">
@@ -1301,7 +1247,7 @@ export default function ManageEvents() {
                     Add Data Point
                   </button>
                 </div>
-                
+
                 {envDataLoading ? (
                   <div className="flex items-center justify-center py-4">
                     <div className="h-5 w-5 animate-spin rounded-full border-2 border-gray-200 border-t-brand-500"></div>
@@ -1393,7 +1339,7 @@ export default function ManageEvents() {
               <h2 className="text-lg font-medium text-gray-800 dark:text-white">
                 {!editingEnvData.id ? 'Add Environmental Data' : 'Edit Environmental Data'}
               </h2>
-              <button 
+              <button
                 onClick={() => setIsEnvDataModalOpen(false)}
                 className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
               >
@@ -1422,7 +1368,7 @@ export default function ManageEvents() {
                   ))}
                 </select>
               </div>
-              
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label htmlFor="value" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -1439,7 +1385,7 @@ export default function ManageEvents() {
                     className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-gray-700 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300"
                   />
                 </div>
-                
+
                 <div>
                   <label htmlFor="unit" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Unit
@@ -1456,7 +1402,7 @@ export default function ManageEvents() {
                   />
                 </div>
               </div>
-              
+
               <div>
                 <label htmlFor="timestamp" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Timestamp
@@ -1471,7 +1417,7 @@ export default function ManageEvents() {
                   className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-gray-700 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300"
                 />
               </div>
-              
+
               <div>
                 <label htmlFor="description" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Description
@@ -1508,4 +1454,27 @@ export default function ManageEvents() {
       )}
     </>
   );
+}
+// Fetch environmental data for a specific event
+async function getEnvironmentalDataByEventId(eventId: string): Promise<EnvironmentalData[]> {
+  try {
+    const token = localStorage.getItem('accessToken');
+    const response = await fetch(`https://localhost:7235/api/EnvironmentalData/event/${eventId}`, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || 'Failed to fetch environmental data');
+    }
+
+    return await response.json();
+  } catch (err: any) {
+    console.error('Error fetching environmental data:', err);
+    return [];
+  }
 }
