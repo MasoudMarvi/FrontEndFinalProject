@@ -479,7 +479,7 @@ export default function ManageEvents() {
   if (isLoading) {
     return (
       <>
-        <PageBreadCrumb title="Manage Events" page="Admin" />
+        <PageBreadCrumb pageTitle="Manage Events" Url="/admin-dashboard" />
         <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
           <div className="flex items-center justify-center p-12">
             <div className="flex flex-col items-center">
@@ -496,7 +496,7 @@ export default function ManageEvents() {
   if (error) {
     return (
       <>
-        <PageBreadCrumb title="Manage Events" page="Admin" />
+        <PageBreadCrumb pageTitle="Manage Events" Url="/admin-dashboard" />
         <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
           <div className="flex items-center justify-center p-12">
             <div className="flex flex-col items-center text-center">
@@ -519,7 +519,7 @@ export default function ManageEvents() {
 
   return (
     <>
-      <PageBreadCrumb title="Manage Events" page="Admin" />
+      <PageBreadCrumb pageTitle="Manage Events" Url="/admin-dashboard" />
 
       <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
