@@ -3,7 +3,6 @@ import React, { useState, useRef, useEffect } from 'react';
 import PageBreadCrumb from '@/components/common/PageBreadCrumb';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import Image from 'next/image';
 import { GoogleMap, Marker } from '@react-google-maps/api';
 import { useGoogleMaps } from '@/context/GoogleMapsContext';
 import { getEvents, getEventById, updateEvent, deleteEvent } from '@/lib/api/events';
@@ -785,7 +784,7 @@ export default function ManageEvents() {
                 ></textarea>
               </div>
 
-              {/* Image Management - Updated to match CreateEventForm with 3 specific image slots */}
+              {/* Image Management - Updated to use regular HTML img tags instead of Next.js Image */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Event Images (Up to 3)
@@ -797,11 +796,10 @@ export default function ManageEvents() {
                     {editingEvent.picture1 ? (
                       <div className="relative w-full">
                         <div className="relative h-48 w-full rounded-lg overflow-hidden">
-                          <Image
+                          <img
                             src={getImageUrl(editingEvent.picture1)}
                             alt="Event preview 1"
-                            fill
-                            className="object-cover"
+                            className="object-cover w-full h-full"
                             onError={(e) => {
                               // Fallback to default image
                               (e.target as HTMLImageElement).src = DEFAULT_IMAGE;
@@ -871,11 +869,10 @@ export default function ManageEvents() {
                     {editingEvent.picture2 ? (
                       <div className="relative w-full">
                         <div className="relative h-48 w-full rounded-lg overflow-hidden">
-                          <Image
+                          <img
                             src={getImageUrl(editingEvent.picture2)}
                             alt="Event preview 2"
-                            fill
-                            className="object-cover"
+                            className="object-cover w-full h-full"
                             onError={(e) => {
                               // Fallback to default image
                               (e.target as HTMLImageElement).src = DEFAULT_IMAGE;
@@ -945,11 +942,10 @@ export default function ManageEvents() {
                     {editingEvent.picture3 ? (
                       <div className="relative w-full">
                         <div className="relative h-48 w-full rounded-lg overflow-hidden">
-                          <Image
+                          <img
                             src={getImageUrl(editingEvent.picture3)}
                             alt="Event preview 3"
-                            fill
-                            className="object-cover"
+                            className="object-cover w-full h-full"
                             onError={(e) => {
                               // Fallback to default image
                               (e.target as HTMLImageElement).src = DEFAULT_IMAGE;
@@ -1455,6 +1451,7 @@ export default function ManageEvents() {
     </>
   );
 }
+
 // Fetch environmental data for a specific event
 async function getEnvironmentalDataByEventId(eventId: string): Promise<EnvironmentalData[]> {
   try {
