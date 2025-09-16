@@ -21,12 +21,11 @@ import {
 
 // Define the environmental data type
 interface EnvironmentalData {
-  id: string;
+  dataId?: string;  // Optional for new records
   eventId: string;
-  type: string;  // Air Quality, Noise Level, Water Quality, etc.
+  type: number;  // Air Quality, Noise Level, Water Quality, etc.
   value: number;
   unit: string;  // ppm, dB, etc.
-  timestamp: string;
   description?: string;
 }
 
@@ -340,12 +339,10 @@ export default function ManageEvents() {
     if (!editingEvent) return;
 
     const newEnvData: EnvironmentalData = {
-      id: '', // Empty ID for new records - backend will assign a real ID
       eventId: editingEvent.eventId,
-      type: '',
+      type: 0, // Default to first type (e.g., Air Quality)
       value: 0,
       unit: '',
-      timestamp: new Date().toISOString(),
       description: ''
     };
 
@@ -373,12 +370,18 @@ export default function ManageEvents() {
 
     try {
       // This is a new API call specifically for environmental data
-      if (editingEnvData.id) {
+      if (editingEnvData.dataId) {
         // Update existing environmental data
-        await updateEnvironmentalData(editingEnvData);
+        await updateEnvironmentalData({
+          ...editingEnvData,
+          description: editingEnvData.description ?? null
+        });
       } else {
         // Create new environmental data
-        await createEnvironmentalData(editingEnvData);
+        await createEnvironmentalData({
+          data: {...editingEnvData, description: editingEnvData.description ?? null
+          }
+        });
       }
 
       // Fetch updated environmental data
@@ -416,7 +419,7 @@ export default function ManageEvents() {
         await deleteEnvironmentalData(id);
 
         // Update the local state
-        const updatedEnvData = editingEvent.environmentalData.filter(item => item.id !== id);
+        const updatedEnvData = editingEvent.environmentalData.filter(item => item.dataId !== id);
 
         setEditingEvent({
           ...editingEvent,
@@ -462,7 +465,15 @@ export default function ManageEvents() {
 
   // Status options
   const statuses = ['All Status', 'Active', 'Pending', 'Cancelled'];
-  const envDataTypes = ['Air Quality', 'Noise Level', 'Water Quality', 'Temperature', 'Humidity', 'Wind Speed', 'Other'];
+  const envDataTypes = [
+    { value: 0, label: "Air Quality" },
+    { value: 1, label: "Noise Level" },
+    { value: 2, label: "Water Quality" },
+    { value: 3, label: "Temperature" },
+    { value: 4, label: "Humidity" },
+    { value: 5, label: "Wind Speed" },
+    { value: 6, label: "Other" },
+  ];
 
   // Loading state
   if (isLoading) {
@@ -1257,31 +1268,31 @@ export default function ManageEvents() {
                           <th className="py-2 px-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
                           <th className="py-2 px-3 text-left text-xs font-medium text-gray-500 uppercase">Value</th>
                           <th className="py-2 px-3 text-left text-xs font-medium text-gray-500 uppercase">Unit</th>
-                          <th className="py-2 px-3 text-left text-xs font-medium text-gray-500 uppercase">Timestamp</th>
+                          <th className="py-2 px-3 text-left text-xs font-medium text-gray-500 uppercase">Description</th>
                           <th className="py-2 px-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                         {editingEvent.environmentalData.map(data => (
-                          <tr key={data.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
-                            <td className="py-2 px-3 text-sm text-gray-800 dark:text-gray-300">{data.type}</td>
+                          <tr key={data.dataId} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                               <td className="py-2 px-3 text-sm text-gray-800 dark:text-gray-300">
+                              {envDataTypes.find(t => t.value === data.type)?.label || 'Unknown'}
+                            </td>
                             <td className="py-2 px-3 text-sm text-gray-800 dark:text-gray-300">{data.value}</td>
                             <td className="py-2 px-3 text-sm text-gray-800 dark:text-gray-300">{data.unit}</td>
-                            <td className="py-2 px-3 text-sm text-gray-800 dark:text-gray-300">
-                              {new Date(data.timestamp).toLocaleString()}
-                            </td>
+                            <td className="py-2 px-3 text-sm text-gray-800 dark:text-gray-300">{data.description}</td>
                             <td className="py-2 px-3 text-right">
                               <div className="flex justify-end space-x-2">
-                                <button
+                                {/* <button
                                   type="button"
                                   onClick={() => handleEditEnvData(data)}
                                   className="text-xs text-brand-600 hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300"
                                 >
                                   Edit
-                                </button>
+                                </button> */}
                                 <button
                                   type="button"
-                                  onClick={() => handleDeleteEnvData(data.id)}
+                                  onClick={() => data.dataId && handleDeleteEnvData(data.dataId)}
                                   className="text-xs text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
                                 >
                                   Delete
@@ -1333,7 +1344,7 @@ export default function ManageEvents() {
           <div className="bg-white dark:bg-gray-800 rounded-lg w-full max-w-md max-h-[90vh] overflow-y-auto p-6 m-4">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-lg font-medium text-gray-800 dark:text-white">
-                {!editingEnvData.id ? 'Add Environmental Data' : 'Edit Environmental Data'}
+                {!editingEnvData.dataId ? 'Add Environmental Data' : 'Edit Environmental Data'}
               </h2>
               <button
                 onClick={() => setIsEnvDataModalOpen(false)}
@@ -1356,13 +1367,20 @@ export default function ManageEvents() {
                   value={editingEnvData.type}
                   onChange={handleEnvDataChange}
                   required
-                  className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-gray-700 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300"
+                  className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-gray-700 
+             focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 
+             dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300"
                 >
-                  <option value="" disabled>Select a data type</option>
-                  {envDataTypes.map(type => (
-                    <option key={type} value={type}>{type}</option>
+                  <option value="" disabled>
+                    Select a data type
+                  </option>
+                  {envDataTypes.map(({ value, label }) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
                   ))}
                 </select>
+
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -1398,22 +1416,6 @@ export default function ManageEvents() {
                   />
                 </div>
               </div>
-
-              <div>
-                <label htmlFor="timestamp" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Timestamp
-                </label>
-                <input
-                  type="datetime-local"
-                  id="timestamp"
-                  name="timestamp"
-                  value={editingEnvData.timestamp.substring(0, 16)}
-                  onChange={handleEnvDataChange}
-                  required
-                  className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-gray-700 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300"
-                />
-              </div>
-
               <div>
                 <label htmlFor="description" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Description
@@ -1456,7 +1458,7 @@ export default function ManageEvents() {
 async function getEnvironmentalDataByEventId(eventId: string): Promise<EnvironmentalData[]> {
   try {
     const token = localStorage.getItem('accessToken');
-    const response = await fetch(`https://localhost:7235/api/EnvironmentalData/event/${eventId}`, {
+    const response = await fetch(`https://localhost:7235/api/EnvironmentalData/GetEnvironmentalDataByEventId/${eventId}`, {
       method: 'GET',
       headers: {
         Authorization: `Bearer ${token}`,

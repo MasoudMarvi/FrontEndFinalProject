@@ -44,32 +44,18 @@ export interface CreateContactMessageCommand {
 // New EnvironmentalData types
 export interface EnvironmentalDataDto {
   dataId: string;
-  latitude: number;
-  longitude: number;
-  airQualityIndex: number;
-  pollutionLevel: number;
-  temperature: number;
-  timestamp: string;
+  type: number;
+  unit: string | null;
+  value: number;
+  description: string | null;
   eventId: string;
 }
 
 export interface CreateEnvironmentalDataDto {
-  latitude: number;
-  longitude: number;
-  airQualityIndex: number;
-  pollutionLevel: number;
-  temperature: number;
-  timestamp: string;
-  eventId: string;
-}
-
-export interface UpdateEnvironmentalDataDto {
-  latitude: number;
-  longitude: number;
-  airQualityIndex: number;
-  pollutionLevel: number;
-  temperature: number;
-  timestamp: string;
+  type: number;
+  unit: string | null;
+  value: number;
+  description: string | null;
   eventId: string;
 }
 
@@ -81,6 +67,14 @@ export interface UpdateEnvironmentalDataCommand {
   dataId: string;
   data: UpdateEnvironmentalDataDto;
 }
+export interface UpdateEnvironmentalDataDto {
+  type: number;
+  unit: string | null;
+  value: number;
+  description: string | null;
+  eventId: string;
+}
+
 
 export interface EventCategoryDto {
   categoryId: string;
