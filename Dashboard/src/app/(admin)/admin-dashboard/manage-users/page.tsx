@@ -43,7 +43,19 @@ const ManageUsersPage = () => {
   // Handle user creation
   const handleCreateUser = async (userData: CreateUserCommand) => {
     try {
-      await usersApi.createUser(userData);
+      // Create a FormData object for multipart/form-data request
+      const formData = new FormData();
+      formData.append('Email', userData.email || '');
+      formData.append('Password', userData.password || '');
+      formData.append('FullName', userData.fullName || '');
+      formData.append('Role', userData.role || 'User');
+      
+      // Handle profile picture if it exists
+      if (userData.profilePicture instanceof File) {
+        formData.append('ProfilePicture', userData.profilePicture);
+      }
+      
+      await usersApi.createUser(formData);
       setIsCreateModalOpen(false);
       fetchUsers(); // Refresh the users list
       showNotification('User created successfully', 'success');
@@ -53,19 +65,20 @@ const ManageUsersPage = () => {
     }
   };
   
-  // Handle user update
-  const handleUpdateUser = async (userData: UpdateUserCommand) => {
-    try {
-      await usersApi.updateUser(userData);
-      setIsEditModalOpen(false);
-      fetchUsers(); // Refresh the users list
-      showNotification('User updated successfully', 'success');
-    } catch (err: any) {
-      console.error('Error updating user:', err);
-      showNotification(err.message || 'Failed to update user', 'error');
-    }
-  };
-  
+// Handle user update
+const handleUpdateUser = async (userData: UpdateUserCommand) => {
+  try {
+    // Call the updateUser function which handles FormData internally
+    await usersApi.updateUser(userData);
+    setIsEditModalOpen(false);
+    fetchUsers(); // Refresh the users list
+    showNotification('User updated successfully', 'success');
+  } catch (err: any) {
+    console.error('Error updating user:', err);
+    showNotification(err.message || 'Failed to update user', 'error');
+  }
+};
+
   // Handle user deletion
   const handleDeleteUser = async (userId: string) => {
     try {
@@ -112,7 +125,7 @@ const ManageUsersPage = () => {
       user.roles.some(role => role.toLowerCase().includes(searchTerm.toLowerCase())))
   );
   
-  // Simple notification system (replace with your preferred notification system)
+  // Simple notification system
   const [notification, setNotification] = useState<{ message: string; type: string } | null>(null);
   
   const showNotification = (message: string, type: 'success' | 'error') => {
@@ -127,7 +140,7 @@ const ManageUsersPage = () => {
       {/* Notification */}
       {notification && (
         <div className={`p-4 mb-4 rounded-lg ${
-          notification.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+          notification.type === 'success' ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300' : 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-300'
         }`}>
           {notification.message}
         </div>
@@ -162,7 +175,7 @@ const ManageUsersPage = () => {
         
         {/* Error state */}
         {error && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4 dark:bg-red-900/20 dark:border-red-800 dark:text-red-300">
             {error}
           </div>
         )}
