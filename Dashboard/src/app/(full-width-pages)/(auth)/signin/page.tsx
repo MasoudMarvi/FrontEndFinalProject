@@ -2,7 +2,7 @@ import SignInForm from "@/components/auth/SignInForm";
 import { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Event Management System - Sign In",
+  title: "Event Mapper - Sign In",
   description: "Sign in to access your event management dashboard",
 };
 

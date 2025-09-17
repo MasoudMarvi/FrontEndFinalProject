@@ -17,36 +17,35 @@ export default function SignInForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
 
   // Function to handle sign in
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg("");
+    setIsLoading(true);
 
     try {
       const user = await login({ email, password });
 
-      // 🔑 You already store tokens in localStorage inside login()
-      // Now decide where to go based on roles
-      if (user.roles.includes("Admin")) {
+      // Determine where to redirect based on user role
+      if (user.roles && user.roles.includes("Admin")) {
         router.push("/admin-dashboard");
       } else {
         router.push("/user-dashboard");
       }
     } catch (error: any) {
-      setErrorMsg(error.message);
+      setErrorMsg(error.message || "Login failed. Please check your credentials.");
     } finally {
+      setIsLoading(false);
     }
   };
-
-
 
   return (
     <div className="flex flex-col flex-1 lg:w-1/2 w-full">
       <div className="flex flex-col justify-center flex-1 w-full max-w-md mx-auto">
         <div>
-
           <div className="flex flex-col items-center mb-8">
             <Image
               src="/images/Events.png"
@@ -56,7 +55,7 @@ export default function SignInForm() {
               className="mb-4"
             />
             <h1 className="mb-2 font-semibold text-gray-800 text-title-sm dark:text-white/90 sm:text-title-md">
-              Event Management System
+              Event Mapper
             </h1>
             <p className="text-sm text-gray-500 dark:text-gray-400 text-center">
               Your comprehensive solution for event planning and management
@@ -65,7 +64,11 @@ export default function SignInForm() {
 
           <div>
             <form onSubmit={handleSignIn}>
-              {errorMsg && <p className="text-red-500 text-center">{errorMsg}</p>}
+              {errorMsg && (
+                <div className="p-3 mb-4 text-sm text-center text-red-600 bg-red-100 rounded-md dark:bg-red-900/30 dark:text-red-400">
+                  {errorMsg}
+                </div>
+              )}
               <div className="space-y-6">
                 <div>
                   <Label>
@@ -77,6 +80,7 @@ export default function SignInForm() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
+                    disabled={isLoading}
                   />
                 </div>
                 <div>
@@ -90,6 +94,7 @@ export default function SignInForm() {
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       required
+                      disabled={isLoading}
                     />
                     <span
                       onClick={() => setShowPassword(!showPassword)}
@@ -118,8 +123,15 @@ export default function SignInForm() {
                   </Link>
                 </div>
                 <div>
-                  <Button className="w-full" size="sm" >
-                    Sign in
+                  <Button className="w-full" size="sm" disabled={isLoading} type="submit">
+                    {isLoading ? (
+                      <div className="flex items-center justify-center">
+                        <div className="w-5 h-5 mr-2 border-2 border-t-transparent border-white rounded-full animate-spin"></div>
+                        <span>Signing in...</span>
+                      </div>
+                    ) : (
+                      "Sign in"
+                    )}
                   </Button>
                 </div>
               </div>

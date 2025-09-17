@@ -2,7 +2,7 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useSidebar } from "../context/SidebarContext";
 import {
   CalenderIcon,
@@ -20,46 +20,61 @@ type NavItem = {
   icon: React.ReactNode;
   path?: string;
   subItems?: { name: string; path: string; pro?: boolean; new?: boolean }[];
+  roles?: string[]; // Add roles property to control visibility based on user role
 };
-
-// Simplified navigation items for event management system
-const navItems: NavItem[] = [
-  {
-    icon: <GridIcon />,
-    name: "Dashboard",
-    subItems: [
-      { name: "User Dashboard", path: "/user-dashboard", pro: false },
-      { name: "Admin Dashboard", path: "/admin-dashboard", pro: false },
-    ],
-  },
-  {
-    icon: <UserCircleIcon />,
-    name: "User Profile",
-    path: "/profile",
-  },
-  {
-    icon: <CalenderIcon />,
-    name: "Calendar",
-    path: "/calendar",
-  },
-  {
-    name: "Create Event",
-    icon: <ListIcon />,
-    path: "/form-elements",  // Keeping the same path for now
-  },
-  {
-    name: "My Events",
-    icon: <TableIcon />,
-    path: "/basic-tables",  // Keeping the same path for now
-  },
-];
-
-// No others items - we're simplifying the sidebar
-const othersItems: NavItem[] = [];
 
 const AppSidebar: React.FC = () => {
   const { isExpanded, isMobileOpen, isHovered, setIsHovered } = useSidebar();
   const pathname = usePathname();
+  const router = useRouter();
+  const [userRole, setUserRole] = useState<string[]>([]);
+  
+  // Get user role from localStorage on component mount
+  useEffect(() => {
+    try {
+      const storedRoles = localStorage.getItem('roles');
+      if (storedRoles) {
+        setUserRole(JSON.parse(storedRoles));
+      }
+    } catch (error) {
+      console.error("Error parsing user roles:", error);
+    }
+  }, []);
+
+  // Determine dashboard path based on user role
+  const dashboardPath = userRole.includes("Admin") ? "/admin-dashboard" : "/user-dashboard";
+
+  // Simplified navigation items for event management system
+  const navItems: NavItem[] = [
+    {
+      icon: <GridIcon />,
+      name: "Dashboard",
+      path: dashboardPath, // Use the dynamic path based on role
+    },
+    {
+      icon: <UserCircleIcon />,
+      name: "User Profile",
+      path: "/profile",
+    },
+    {
+      icon: <CalenderIcon />,
+      name: "Calendar",
+      path: "/calendar",
+    },
+    {
+      name: "Create Event",
+      icon: <ListIcon />,
+      path: "/form-elements",  // Keeping the same path for now
+    },
+    {
+      name: "My Events",
+      icon: <TableIcon />,
+      path: "/basic-tables",  // Keeping the same path for now
+    },
+  ];
+
+  // No others items - we're simplifying the sidebar
+  const othersItems: NavItem[] = [];
 
   const renderMenuItems = (
     navItems: NavItem[],
@@ -222,7 +237,7 @@ const AppSidebar: React.FC = () => {
     if (!submenuMatched) {
       setOpenSubmenu(null);
     }
-  }, [pathname, isActive]);
+  }, [pathname, isActive, navItems]);
 
   useEffect(() => {
     // Set the height of the submenu items when the submenu is opened
