@@ -127,7 +127,28 @@ export async function createUser(data: CreateUserCommand): Promise<AuthResponse>
 
 export async function updateUser(data: UpdateUserCommand): Promise<UserResponse> {
   try {
-    const res = await api.put<UserResponse>('/Users/UpdateUser', data);
+    // Create FormData for multipart/form-data request
+    const formData = new FormData();
+    formData.append('UserId', data.userId);
+    formData.append('Email', data.email || '');
+    formData.append('FullName', data.fullName || '');
+    formData.append('Role', data.role || '');
+    
+    // If there's a profile picture, add it
+    if (data.profilePicture instanceof File) {
+      formData.append('ProfilePicture', data.profilePicture);
+    }
+    
+    // Make the API request
+    const res = await api.put<UserResponse>('/Users/UpdateUser', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    });
+    
+    // Update localStorage with new fullName
+    localStorage.setItem('fullName', data.fullName || '');
+    
     return res.data;
   } catch (err: any) {
     throw new Error(err.response?.data?.message || 'User update failed');

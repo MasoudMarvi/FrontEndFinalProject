@@ -164,6 +164,7 @@ export interface UpdateUserCommand {
   email: string | null;
   fullName: string | null;
   role: string | null;
+    profilePicture?: File; // Add optional profilePicture field
 }
 
 export interface AuthResponse {

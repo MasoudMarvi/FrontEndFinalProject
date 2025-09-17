@@ -5,25 +5,28 @@ import { Modal } from "../ui/modal";
 import Button from "../ui/button/Button";
 import Input from "../form/input/InputField";
 import Label from "../form/Label";
-import axios from "axios";
+import { updateUser } from "@/lib/api/users"; // Import the updateUser function
 
 export default function UserInfoCard() {
   const { isOpen, openModal, closeModal } = useModal();
   const [isClient, setIsClient] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [updateLoading, setUpdateLoading] = useState(false);
+  const [updateSuccess, setUpdateSuccess] = useState(false);
+  const [updateError, setUpdateError] = useState<string | null>(null);
   
   // User data state
   const [userData, setUserData] = useState({
     userId: '',
     fullName: '',
     email: '',
+    role: ''
   });
   
   // Form state
   const [formData, setFormData] = useState({
     fullName: '',
-    email: '',
   });
 
   // Set isClient to true when component mounts
@@ -39,16 +42,19 @@ export default function UserInfoCard() {
         const userId = localStorage.getItem('userId') || '';
         const fullName = localStorage.getItem('fullName') || '';
         const email = localStorage.getItem('email') || '';
+        const rolesStr = localStorage.getItem('roles') || '["User"]';
+        const roles = JSON.parse(rolesStr);
+        const role = Array.isArray(roles) ? roles[0] : roles;
         
         setUserData({
           userId,
           fullName,
-          email
+          email,
+          role
         });
         
         setFormData({
           fullName,
-          email
         });
         
         setLoading(false);
@@ -60,6 +66,14 @@ export default function UserInfoCard() {
     }
   }, [isClient]);
 
+  // Reset status messages when modal opens/closes
+  useEffect(() => {
+    if (!isOpen) {
+      setUpdateSuccess(false);
+      setUpdateError(null);
+    }
+  }, [isOpen]);
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
@@ -67,26 +81,42 @@ export default function UserInfoCard() {
 
   const handleSave = async () => {
     try {
-      // You would implement an API call to update the user profile
-      // For now, just update localStorage to demonstrate the functionality
+      setUpdateLoading(true);
+      setUpdateError(null);
+      
+      // Create FormData for the multipart/form-data request
+      const formDataObj = new FormData();
+      formDataObj.append('UserId', userData.userId);
+      formDataObj.append('FullName', formData.fullName);
+      formDataObj.append('Email', userData.email); // Keep the original email
+      formDataObj.append('Role', userData.role); // Keep the original role
+      
+      // Make the API request using the updateUser function
+      await updateUser({
+        userId: userData.userId,
+        email: userData.email,
+        fullName: formData.fullName,
+        role: userData.role
+      });
+      
+      // Update localStorage with the new fullName
       localStorage.setItem('fullName', formData.fullName);
-      localStorage.setItem('email', formData.email);
       
       // Update the displayed user data
       setUserData(prev => ({
         ...prev,
-        fullName: formData.fullName,
-        email: formData.email
+        fullName: formData.fullName
       }));
       
-      // Close the modal
-      closeModal();
-      
-      // In a real implementation, you would have an API call like:
-      // const response = await axios.put('/api/users/profile', formData);
-      // if successful, update localStorage and state
-    } catch (err) {
-      console.error("Error saving profile:", err);
+      setUpdateSuccess(true);
+      setTimeout(() => {
+        closeModal();
+      }, 1500);
+    } catch (err: any) {
+      console.error("Error updating profile:", err);
+      setUpdateError(err.message || "Failed to update profile");
+    } finally {
+      setUpdateLoading(false);
     }
   };
 
@@ -173,18 +203,32 @@ export default function UserInfoCard() {
               Edit Personal Information
             </h4>
             <p className="mb-6 text-sm text-gray-500 dark:text-gray-400 lg:mb-7">
-              Update your details to keep your profile up-to-date.
+              Update your full name to keep your profile up-to-date.
             </p>
           </div>
-          <form className="flex flex-col">
+          
+          {/* Status messages */}
+          {updateError && (
+            <div className="mb-4 mx-2 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg">
+              {updateError}
+            </div>
+          )}
+          
+          {updateSuccess && (
+            <div className="mb-4 mx-2 p-3 bg-green-50 border border-green-200 text-green-700 rounded-lg">
+              Profile updated successfully!
+            </div>
+          )}
+          
+          <form className="flex flex-col" onSubmit={(e) => { e.preventDefault(); handleSave(); }}>
             <div className="custom-scrollbar overflow-y-auto px-2 pb-3">
               <div className="mt-7">
                 <h5 className="mb-5 text-lg font-medium text-gray-800 dark:text-white/90 lg:mb-6">
                   Personal Information
                 </h5>
 
-                <div className="grid grid-cols-1 gap-x-6 gap-y-5 lg:grid-cols-2">
-                  <div className="col-span-2">
+                <div className="grid grid-cols-1 gap-x-6 gap-y-5">
+                  <div>
                     <Label>Full Name</Label>
                     <Input 
                       type="text" 
@@ -194,24 +238,44 @@ export default function UserInfoCard() {
                     />
                   </div>
 
-                  <div className="col-span-2">
+                  <div>
                     <Label>Email Address</Label>
                     <Input 
                       type="text" 
-                      name="email"
-                      value={formData.email}
-                      onChange={handleInputChange}
+                      value={userData.email}
+                      readOnly
+                      disabled
+                      className="bg-gray-100 text-gray-500 cursor-not-allowed"
                     />
+                    <p className="mt-1 text-xs text-gray-500">Email address cannot be changed</p>
                   </div>
                 </div>
               </div>
             </div>
             <div className="flex items-center gap-3 px-2 mt-6 lg:justify-end">
-              <Button size="sm" variant="outline" onClick={closeModal}>
-                Close
+              <Button 
+                size="sm" 
+                variant="outline" 
+                onClick={closeModal}
+                type="button"
+                disabled={updateLoading}
+              >
+                Cancel
               </Button>
-              <Button size="sm" onClick={handleSave}>
-                Save Changes
+              <Button 
+                size="sm" 
+                type="submit"
+                disabled={updateLoading}
+              >
+                {updateLoading ? (
+                  <>
+                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Saving...
+                  </>
+                ) : "Save Changes"}
               </Button>
             </div>
           </form>

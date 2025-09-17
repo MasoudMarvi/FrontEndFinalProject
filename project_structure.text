@@ -112,6 +112,7 @@
         - task.png
       - user
         - HosseinMarvi.jpg
+        - NoImage.jpeg
         - user-01.jpg
         - user-02.jpg
         - user-03.jpg
@@ -161,6 +162,8 @@
               - page.tsx
             - line-chart
               - page.tsx
+          - about
+            - page.tsx
           - blank
             - page.tsx
           - calendar
@@ -325,7 +328,6 @@
         - SixteenIsToNine.tsx
         - TwentyOneIsToNine.tsx
     - context
-      - AuthContext.tsx
       - GoogleMapsContext.tsx
       - SidebarContext.tsx
       - ThemeContext.tsx
