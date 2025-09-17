@@ -63,21 +63,19 @@ const handleSignUp = async (e: React.FormEvent) => {
             <form onSubmit={handleSignUp}>
               {errorMsg && <p className="text-red-500 text-center">{errorMsg}</p>}
               <div className="space-y-5">
-                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-                  {/* <!-- First Name --> */}
-                  <div className="sm:col-span-1">
-                    <Label>
-                      Full Name<span className="text-error-500">*</span>
-                    </Label>
-                    <Input
-                      type="text"
-                      id="fname"
-                      name="fname"
-                      value={fullName}
-                      onChange={(e) => setFullname(e.target.value)}
-                      placeholder="Enter your first name"
-                    />
-                  </div>
+                {/* <!-- Full Name --> */}
+                <div>
+                  <Label>
+                    Full Name<span className="text-error-500">*</span>
+                  </Label>
+                  <Input
+                    type="text"
+                    id="fname"
+                    name="fname"
+                    value={fullName}
+                    onChange={(e) => setFullname(e.target.value)}
+                    placeholder="Enter your full name"
+                  />
                 </div>
                 {/* <!-- Email --> */}
                 <div>
