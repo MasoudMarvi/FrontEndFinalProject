@@ -7,7 +7,8 @@ import PageBreadCrumb from '@/components/common/PageBreadCrumb';
 import { GoogleMap, Marker } from '@react-google-maps/api';
 import { useGoogleMaps } from '@/context/GoogleMapsContext';
 import { getEventById } from '@/lib/api/events';
-import { EventDetailDto, EventStatus } from '@/lib/api/types';
+import { getEnvironmentalDataByEventId } from '@/lib/api/environmentalData';
+import { EventDetailDto, EventStatus, EnvironmentalDataDto } from '@/lib/api/types';
 
 // Default placeholder image when no images are available
 const DEFAULT_IMAGE = '/images/event/event-01.jpg';
@@ -20,6 +21,36 @@ const containerStyle = {
   height: '300px'
 };
 
+// Environmental data type mapping
+const getEnvironmentalTypeLabel = (type: number): string => {
+  const typeMap: { [key: number]: string } = {
+    0: 'Temperature',
+    1: 'Humidity',
+    2: 'Air Quality',
+    3: 'Noise Level',
+    4: 'UV Index',
+    5: 'Wind Speed',
+    6: 'Pressure',
+    7: 'Precipitation'
+  };
+  return typeMap[type] || `Type ${type}`;
+};
+
+// Get icon for environmental data type
+const getEnvironmentalIcon = (type: number): string => {
+  const iconMap: { [key: number]: string } = {
+    0: '🌡️', // Temperature
+    1: '💧', // Humidity
+    2: '🌬️', // Air Quality
+    3: '🔊', // Noise Level
+    4: '☀️', // UV Index
+    5: '💨', // Wind Speed
+    6: '📊', // Pressure
+    7: '🌧️'  // Precipitation
+  };
+  return iconMap[type] || '📈';
+};
+
 export default function EventDetailsPage() {
   const { isLoaded } = useGoogleMaps();
   const router = useRouter();
@@ -27,14 +58,17 @@ export default function EventDetailsPage() {
   const eventId = params.eventId as string;
   
   const [event, setEvent] = useState<EventDetailDto | null>(null);
+  const [environmentalData, setEnvironmentalData] = useState<EnvironmentalDataDto[]>([]);
   const [loading, setLoading] = useState(true);
+  const [environmentalLoading, setEnvironmentalLoading] = useState(true);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [showCopySuccess, setShowCopySuccess] = useState(false);
   
   // State for event images
   const [eventImages, setEventImages] = useState<string[]>([]);
   
-  // Fetch event details from backend
+  // Fetch event details and environmental data from backend
   useEffect(() => {
     async function fetchEventData() {
       try {
@@ -68,7 +102,21 @@ export default function EventDetailsPage() {
       }
     }
     
+    async function fetchEnvironmentalData() {
+      try {
+        setEnvironmentalLoading(true);
+        const envData = await getEnvironmentalDataByEventId(eventId);
+        setEnvironmentalData(envData);
+      } catch (err: any) {
+        console.error("Error fetching environmental data:", err);
+        // Don't set error state for environmental data, just log it
+      } finally {
+        setEnvironmentalLoading(false);
+      }
+    }
+    
     fetchEventData();
+    fetchEnvironmentalData();
   }, [eventId]);
   
   const formatDateForDisplay = (dateString: string) => {
@@ -90,6 +138,26 @@ export default function EventDetailsPage() {
   const prevImage = () => {
     if (eventImages.length > 0) {
       setCurrentImageIndex((prev) => (prev - 1 + eventImages.length) % eventImages.length);
+    }
+  };
+
+  const handleShareEvent = async () => {
+    try {
+      const url = window.location.href;
+      await navigator.clipboard.writeText(url);
+      setShowCopySuccess(true);
+      setTimeout(() => setShowCopySuccess(false), 3000);
+    } catch (err) {
+      console.error('Failed to copy link:', err);
+      // Fallback for older browsers
+      const textArea = document.createElement('textarea');
+      textArea.value = window.location.href;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+      setShowCopySuccess(true);
+      setTimeout(() => setShowCopySuccess(false), 3000);
     }
   };
   
@@ -120,6 +188,18 @@ export default function EventDetailsPage() {
   return (
     <>
       <PageBreadCrumb title="Event Details" page="Event" />
+      
+      {/* Success notification for copy */}
+      {showCopySuccess && (
+        <div className="fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-50 animate-fade-in-out">
+          <div className="flex items-center">
+            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
+            </svg>
+            Event link copied to clipboard!
+          </div>
+        </div>
+      )}
       
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Event Details */}
@@ -286,39 +366,83 @@ export default function EventDetailsPage() {
             </div>
           </div>
           
-          <div className="mt-6 flex space-x-4">
+          <div className="mt-6">
             <Link 
               href={`/events/${eventId}/chat`}
-              className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 flex items-center gap-2"
+              className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 flex items-center gap-2 inline-flex"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clipRule="evenodd" />
               </svg>
               Join Chat ({event.chatMessageCount} messages)
             </Link>
-            
-            <Link 
-              href="/events"
-              className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
-            >
-              Back to Events
-            </Link>
           </div>
         </div>
         
         {/* Event Info Sidebar */}
         <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
-          {/* Event Stats */}
-          <div className="p-4 rounded-lg bg-gray-50 dark:bg-gray-800/50 border border-gray-100 dark:border-gray-800">
+          {/* Environmental Data Box */}
+          <div className="mb-6 p-4 rounded-lg bg-gradient-to-br from-green-50 to-blue-50 dark:from-green-900/20 dark:to-blue-900/20 border border-green-200 dark:border-green-800">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center">
+                <span className="mr-2">🌍</span>
+                Environmental Data
+              </h3>
+              {environmentalLoading && (
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-green-500"></div>
+              )}
+            </div>
+            
+            {environmentalLoading ? (
+              <div className="space-y-2">
+                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-3/4"></div>
+              </div>
+            ) : environmentalData.length > 0 ? (
+              <div className="space-y-3">
+                {environmentalData.map((data, index) => (
+                  <div key={index} className="flex items-center justify-between p-2 bg-white/50 dark:bg-gray-800/50 rounded">
+                    <div className="flex items-center">
+                      <span className="text-lg mr-2">{getEnvironmentalIcon(data.type)}</span>
+                      <div>
+                        <span className="text-xs text-gray-600 dark:text-gray-400 block">
+                          {getEnvironmentalTypeLabel(data.type)}
+                        </span>
+                        {data.description && (
+                          <span className="text-xs text-gray-500 dark:text-gray-400">
+                            {data.description}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <span className="font-medium text-gray-800 dark:text-white">
+                        {data.value}
+                      </span>
+                      <span className="text-xs text-gray-500 dark:text-gray-400 ml-1">
+                        {data.unit}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-4">
+                <span className="text-4xl mb-2 block">🌱</span>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  No environmental data available for this event
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Event Stats (Forum count removed) */}
+          <div className="p-4 rounded-lg bg-gray-50 dark:bg-gray-800/50 border border-gray-100 dark:border-gray-800 mb-6">
             <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Event Stats</h3>
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-xs text-gray-500 dark:text-gray-400">Chat Messages</span>
                 <span className="font-medium text-gray-800 dark:text-white">{event.chatMessageCount}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-gray-500 dark:text-gray-400">Forums</span>
-                <span className="font-medium text-gray-800 dark:text-white">{event.forums?.length || 0}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-xs text-gray-500 dark:text-gray-400">Visibility</span>
@@ -339,24 +463,8 @@ export default function EventDetailsPage() {
             </div>
           </div>
           
-          {/* Related Events - Optional section */}
-          <div className="mt-6">
-            <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90 mb-4">Related Events</h3>
-            <div className="space-y-3">
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                Explore more events in the same category.
-              </p>
-              <Link 
-                href={`/events?category=${event.categoryId}`}
-                className="inline-block px-4 py-2 bg-brand-500 text-white rounded hover:bg-brand-600 mt-2"
-              >
-                Browse {event.categoryName} Events
-              </Link>
-            </div>
-          </div>
-          
           {/* Event Actions for Regular Users */}
-          <div className="mt-6">
+          <div>
             <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90 mb-4">Actions</h3>
             <div className="space-y-3">
               <Link 
@@ -381,11 +489,7 @@ export default function EventDetailsPage() {
               
               <button 
                 className="flex items-center w-full px-4 py-2 bg-gray-100 text-gray-700 rounded hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
-                onClick={() => {
-                  const url = window.location.href;
-                  navigator.clipboard.writeText(url);
-                  alert('Event link copied to clipboard!');
-                }}
+                onClick={handleShareEvent}
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
                   <path fillRule="evenodd" d="M12.586 4.586a2 2 0 112.828 2.828l-3 3a2 2 0 01-2.828 0 1 1 0 00-1.414 1.414 4 4 0 005.656 0l3-3a4 4 0 00-5.656-5.656l-1.5 1.5a1 1 0 101.414 1.414l1.5-1.5zm-5 5a2 2 0 012.828 0 1 1 0 101.414-1.414 4 4 0 00-5.656 0l-3 3a4 4 0 105.656 5.656l1.5-1.5a1 1 0 10-1.414-1.414l-1.5 1.5a2 2 0 11-2.828-2.828l3-3z" clipRule="evenodd" />
@@ -396,6 +500,18 @@ export default function EventDetailsPage() {
           </div>
         </div>
       </div>
+
+      <style jsx>{`
+        @keyframes fade-in-out {
+          0% { opacity: 0; transform: translateY(-10px); }
+          10% { opacity: 1; transform: translateY(0); }
+          90% { opacity: 1; transform: translateY(0); }
+          100% { opacity: 0; transform: translateY(-10px); }
+        }
+        .animate-fade-in-out {
+          animation: fade-in-out 3s ease-in-out;
+        }
+      `}</style>
     </>
   );
 }

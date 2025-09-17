@@ -9,7 +9,6 @@ import {
   TableRow,
 } from "../ui/table";
 import Badge from "../ui/badge/Badge";
-import Image from "next/image";
 import { getEvents } from "@/lib/api/events";
 import { EventDto, EventStatus } from "@/lib/api/types";
 
@@ -32,30 +31,21 @@ const IMAGE_BASE_URL = 'https://localhost:7235/uploads/events/';
 
 // Helper function to get the first available image from an event
 function getEventImage(event: EventDto): string {
-  if (event.picture1) {
-    // Try to use the first picture from the event
-    try {
-      // Clean up the path to avoid duplication
-      const cleanPath = event.picture1.replace(/^\/uploads\/events\//, '');
-      return cleanPath ? `${IMAGE_BASE_URL}${cleanPath}` : DEFAULT_IMAGE;
-    } catch (err) {
-      return DEFAULT_IMAGE;
+  try {
+    // Check for valid image paths in order of priority
+    if (event.picture1 && event.picture1.trim() !== '') {
+      return `${IMAGE_BASE_URL}${event.picture1.split('/').pop()}`;
+    } 
+    if (event.picture2 && event.picture2.trim() !== '') {
+      return `${IMAGE_BASE_URL}${event.picture2.split('/').pop()}`;
     }
-  } else if (event.picture2) {
-    try {
-      const cleanPath = event.picture2.replace(/^\/uploads\/events\//, '');
-      return cleanPath ? `${IMAGE_BASE_URL}${cleanPath}` : DEFAULT_IMAGE;
-    } catch (err) {
-      return DEFAULT_IMAGE;
+    if (event.picture3 && event.picture3.trim() !== '') {
+      return `${IMAGE_BASE_URL}${event.picture3.split('/').pop()}`;
     }
-  } else if (event.picture3) {
-    try {
-      const cleanPath = event.picture3.replace(/^\/uploads\/events\//, '');
-      return cleanPath ? `${IMAGE_BASE_URL}${cleanPath}` : DEFAULT_IMAGE;
-    } catch (err) {
-      return DEFAULT_IMAGE;
-    }
+  } catch (err) {
+    console.error("Error processing image URL:", err);
   }
+  
   return DEFAULT_IMAGE;
 }
 
@@ -91,13 +81,16 @@ export default function RecentEvents() {
   const [events, setEvents] = useState<FormattedEvent[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [imageLoadError, setImageLoadError] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     const fetchRecentEvents = async () => {
       try {
         setLoading(true);
-        // Get events from backend, limit to 5
+        // Get events from backend
         const eventsData = await getEvents();
+        
+        const now = new Date();
         
         // Format the events data
         const formattedEvents: FormattedEvent[] = eventsData
@@ -113,12 +106,14 @@ export default function RecentEvents() {
               }),
               status: getStatusDisplay(event.status),
               statusCode: event.status,
-              // Use the first available image or default
+              // Use the helper function to get image URL
               image: getEventImage(event)
             };
           })
-          // Sort by date (newest first)
-          .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+          // Filter only upcoming events (events that haven't ended yet)
+          .filter((event) => new Date(event.date) >= now)
+          // Sort by date (closest upcoming first)
+          .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
           // Limit to 5 events
           .slice(0, 5);
         
@@ -126,7 +121,7 @@ export default function RecentEvents() {
         setLoading(false);
       } catch (err) {
         console.error("Error fetching events:", err);
-        setError("Failed to load recent events");
+        setError("Failed to load upcoming events");
         setLoading(false);
       }
     };
@@ -134,15 +129,20 @@ export default function RecentEvents() {
     fetchRecentEvents();
   }, []);
 
+  const handleImageError = (eventId: string) => {
+    setImageLoadError(prev => ({
+      ...prev,
+      [eventId]: true
+    }));
+  };
+
   if (loading) {
     return (
       <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white px-4 pb-3 pt-4 dark:border-gray-800 dark:bg-white/[0.03] sm:px-6">
-        <div className="flex flex-col gap-2 mb-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">
-              Recent Events
-            </h3>
-          </div>
+        <div className="mb-4">
+          <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">
+            Upcoming Events
+          </h3>
         </div>
         <div className="flex items-center justify-center p-8">
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-gray-200 border-t-brand-500"></div>
@@ -155,12 +155,10 @@ export default function RecentEvents() {
   if (error) {
     return (
       <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white px-4 pb-3 pt-4 dark:border-gray-800 dark:bg-white/[0.03] sm:px-6">
-        <div className="flex flex-col gap-2 mb-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">
-              Recent Events
-            </h3>
-          </div>
+        <div className="mb-4">
+          <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">
+            Upcoming Events
+          </h3>
         </div>
         <div className="flex items-center justify-center p-8 text-red-500">
           <span>{error}</span>
@@ -172,15 +170,13 @@ export default function RecentEvents() {
   if (events.length === 0) {
     return (
       <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white px-4 pb-3 pt-4 dark:border-gray-800 dark:bg-white/[0.03] sm:px-6">
-        <div className="flex flex-col gap-2 mb-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">
-              Recent Events
-            </h3>
-          </div>
+        <div className="mb-4">
+          <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">
+            Upcoming Events
+          </h3>
         </div>
         <div className="flex items-center justify-center p-8 text-gray-500 dark:text-gray-400">
-          <span>No events found</span>
+          <span>No upcoming events found</span>
         </div>
       </div>
     );
@@ -188,56 +184,10 @@ export default function RecentEvents() {
 
   return (
     <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white px-4 pb-3 pt-4 dark:border-gray-800 dark:bg-white/[0.03] sm:px-6">
-      <div className="flex flex-col gap-2 mb-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">
-            Recent Events
-          </h3>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <button className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-theme-sm font-medium text-gray-700 shadow-theme-xs hover:bg-gray-50 hover:text-gray-800 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-white/[0.03] dark:hover:text-gray-200">
-            <svg
-              className="stroke-current fill-white dark:fill-gray-800"
-              width="20"
-              height="20"
-              viewBox="0 0 20 20"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                d="M2.29004 5.90393H17.7067"
-                stroke=""
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-              <path
-                d="M17.7075 14.0961H2.29085"
-                stroke=""
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-              <path
-                d="M12.0826 3.33331C13.5024 3.33331 14.6534 4.48431 14.6534 5.90414C14.6534 7.32398 13.5024 8.47498 12.0826 8.47498C10.6627 8.47498 9.51172 7.32398 9.51172 5.90415C9.51172 4.48432 10.6627 3.33331 12.0826 3.33331Z"
-                fill=""
-                stroke=""
-                strokeWidth="1.5"
-              />
-              <path
-                d="M7.91745 11.525C6.49762 11.525 5.34662 12.676 5.34662 14.0959C5.34661 15.5157 6.49762 16.6667 7.91745 16.6667C9.33728 16.6667 10.4883 15.5157 10.4883 14.0959C10.4883 12.676 9.33728 11.525 7.91745 11.525Z"
-                fill=""
-                stroke=""
-                strokeWidth="1.5"
-              />
-            </svg>
-            Filter
-          </button>
-          <button className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-theme-sm font-medium text-gray-700 shadow-theme-xs hover:bg-gray-50 hover:text-gray-800 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-white/[0.03] dark:hover:text-gray-200">
-            See all
-          </button>
-        </div>
+      <div className="mb-4">
+        <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">
+          Upcoming Events
+        </h3>
       </div>
       <div className="max-w-full overflow-x-auto">
         <Table>
@@ -279,7 +229,8 @@ export default function RecentEvents() {
                   <div className="flex items-center gap-3">
                     <div className="h-[50px] w-[50px] overflow-hidden rounded-md relative">
                       <img
-                        src={DEFAULT_IMAGE}
+                        src={imageLoadError[event.id] ? DEFAULT_IMAGE : event.image}
+                        onError={() => handleImageError(event.id)}
                         className="h-[50px] w-[50px] object-cover"
                         alt={event.title}
                       />
@@ -288,9 +239,6 @@ export default function RecentEvents() {
                       <p className="font-medium text-gray-800 text-theme-sm dark:text-white/90">
                         {event.title}
                       </p>
-                      <span className="text-gray-500 text-theme-xs dark:text-gray-400">
-                        {event.id}
-                      </span>
                     </div>
                   </div>
                 </TableCell>

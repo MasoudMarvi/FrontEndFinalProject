@@ -15,6 +15,15 @@ export async function getEnvironmentalData(): Promise<EnvironmentalDataDto[]> {
   }
 }
 
+export async function getEnvironmentalDataByEventId(eventId: string): Promise<EnvironmentalDataDto[]> {
+  try {
+    const res = await api.get<EnvironmentalDataDto[]>(`/EnvironmentalData/GetEnvironmentalDataByEventId/${eventId}`);
+    return res.data;
+  } catch (err: any) {
+    throw new Error(err.response?.data?.message || 'Failed to fetch environmental data for event');
+  }
+}
+
 export async function createEnvironmentalData(data: CreateEnvironmentalDataCommand): Promise<void> {
   try {
     console.log('Creating environmental data with DTO:', data);
