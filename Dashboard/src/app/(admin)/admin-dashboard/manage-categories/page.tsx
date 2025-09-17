@@ -65,6 +65,7 @@ export default function ManageCategories() {
       if (editingCategory) {
         // Update existing category
         await updateEventCategory(editingCategory.categoryId, {
+          categoryId: editingCategory.categoryId, // Include categoryId in the request body
           categoryName: newCategoryName,
           description: newCategoryDescription
         });
@@ -98,7 +99,6 @@ export default function ManageCategories() {
       alert(`Failed to delete category: ${err.message || 'Unknown error'}`);
     }
   };
-
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center">
@@ -179,19 +179,19 @@ export default function ManageCategories() {
                 {categories.map((category) => (
                   <tr key={category.categoryId} className="hover:bg-gray-50 dark:hover:bg-gray-900/20">
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <div className="h-8 w-8 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center mr-3">
-                          <span className="text-xs font-medium">
-                            {(category.categoryName || 'C').charAt(0)}
-                          </span>
-                        </div>
-                        <div>
-                          <div className="text-sm font-medium text-gray-900 dark:text-white">
-                            {category.categoryName}
-                          </div>
-                        </div>
-                      </div>
-                    </td>
+  <div className="flex items-center">
+    <div className="h-8 w-8 rounded-full bg-brand-100 dark:bg-brand-900 flex items-center justify-center mr-3 border border-brand-200 dark:border-brand-800 shadow-sm">
+      <span className="text-sm font-medium text-brand-700 dark:text-brand-300">
+        {(category.categoryName || 'C').charAt(0).toUpperCase()}
+      </span>
+    </div>
+    <div>
+      <div className="text-sm font-medium text-gray-900 dark:text-white">
+        {category.categoryName}
+      </div>
+    </div>
+  </div>
+</td>
                     <td className="px-6 py-4">
                       <div className="text-sm text-gray-500 dark:text-gray-400">
                         {category.description || 'No description'}
