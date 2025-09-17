@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import Image from "next/image";
 import Input from "@/components/form/input/InputField";
 import Label from "@/components/form/Label";
@@ -53,6 +53,7 @@ export default function CreateEventForm() {
   
   // Map center (default location)
   const mapCenter = { lat: 35.7219, lng: 51.3347 }; // Tehran center
+  const [mapZoom, setMapZoom] = useState(13);
   
   // Map options
   const mapOptions = {
@@ -60,6 +61,12 @@ export default function CreateEventForm() {
     clickableIcons: true,
     scrollwheel: true,
   };
+
+  // Search functionality
+  const [searchQuery, setSearchQuery] = useState("");
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
+  const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
+  const mapRef = useRef<google.maps.Map | null>(null);
   
   // Check user role on component mount
   useEffect(() => {
@@ -106,6 +113,64 @@ export default function CreateEventForm() {
     
     fetchCategories();
   }, []);
+  
+  // Initialize autocomplete when Maps API is loaded
+  useEffect(() => {
+    if (isLoaded && searchInputRef.current && window.google && window.google.maps && window.google.maps.places) {
+      try {
+        const autocomplete = new window.google.maps.places.Autocomplete(searchInputRef.current, {
+          fields: ["formatted_address", "geometry", "name"],
+          types: ["geocode", "establishment"]
+        });
+        
+        autocompleteRef.current = autocomplete;
+        
+        // If map is already loaded, bind to it
+        if (mapRef.current) {
+          autocomplete.bindTo("bounds", mapRef.current);
+        }
+        
+        // Add listener for place selection
+        const listener = autocomplete.addListener("place_changed", () => {
+          const place = autocomplete.getPlace();
+          
+          if (!place.geometry || !place.geometry.location) {
+            console.log("Returned place contains no geometry");
+            return;
+          }
+          
+          // Get location coordinates
+          const lat = place.geometry.location.lat();
+          const lng = place.geometry.location.lng();
+          
+          // Update location and map
+          setLocation({ lat, lng });
+          setMapZoom(15);
+          
+          // Update the map
+          if (mapRef.current) {
+            mapRef.current.panTo({ lat, lng });
+            mapRef.current.setZoom(15);
+          }
+          
+          // Set location name if available
+          if (place.name) {
+            setLocationName(place.name);
+          }
+        });
+        
+        // Clean up listener on unmount
+        return () => {
+          if (google && google.maps && google.maps.event && listener) {
+            google.maps.event.removeListener(listener);
+          }
+          autocompleteRef.current = null;
+        };
+      } catch (error) {
+        console.error("Error initializing Autocomplete:", error);
+      }
+    }
+  }, [isLoaded, searchInputRef.current]);
   
   // Clear messages after 5 seconds
   useEffect(() => {
@@ -175,6 +240,7 @@ export default function CreateEventForm() {
     setStatus(EventStatus.Pending);
     setImageFiles([null, null, null]);
     setImagePreviews([null, null, null]);
+    setSearchQuery("");
   };
   
   // Form submission handler
@@ -259,6 +325,21 @@ export default function CreateEventForm() {
   // Handle notification close and form reset
   const handleNotificationClose = () => {
     closeNotification();
+  };
+
+  // Handle search input change
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchQuery(e.target.value);
+  };
+
+  // Map load handler
+  const onMapLoad = (map: google.maps.Map) => {
+    mapRef.current = map;
+    
+    // Bind autocomplete to map bounds if it exists
+    if (autocompleteRef.current && map) {
+      autocompleteRef.current.bindTo("bounds", map);
+    }
   };
 
   return (
@@ -491,6 +572,32 @@ export default function CreateEventForm() {
             </div>
           </div>
           
+          {/* Search Bar for Location */}
+          <div>
+            <Label htmlFor="locationSearch">
+              Search Location
+            </Label>
+            <div className="relative w-full">
+              <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                <svg className="w-5 h-5 text-gray-400 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                </svg>
+              </div>
+              <input
+                ref={searchInputRef}
+                id="locationSearch"
+                type="text"
+                value={searchQuery}
+                onChange={handleSearchChange}
+                placeholder="Search for a location..."
+                className="w-full rounded-lg border border-gray-200 bg-white pl-10 pr-4 py-2.5 text-gray-700 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300"
+              />
+            </div>
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              Search for a location or click directly on the map below
+            </p>
+          </div>
+          
           {/* Google Map for selecting location */}
           <div>
             <Label htmlFor="eventLocation">
@@ -505,9 +612,10 @@ export default function CreateEventForm() {
                 <GoogleMap
                   mapContainerStyle={{ width: '100%', height: '100%' }}
                   center={location || mapCenter}
-                  zoom={13}
+                  zoom={mapZoom}
                   options={mapOptions}
                   onClick={handleMapClick}
+                  onLoad={onMapLoad}
                 >
                   {location && (
                     <Marker
