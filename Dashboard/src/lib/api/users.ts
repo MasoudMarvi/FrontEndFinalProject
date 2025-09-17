@@ -1,12 +1,13 @@
+// users.ts (Updated version)
 import api from '../axios';
 import { CreateUserCommand, UpdateUserCommand, AuthResponse, RegisterResponse } from './types';
 
 export interface UserResponse {
-  // Define this based on what your API returns
-  userId: string;
+  id: string;
   email: string;
   fullName: string;
-  role: string;
+  roles: string[];
+  profilePictureUrl: string | null;
 }
 
 export async function getUsers(): Promise<UserResponse[]> {
@@ -17,7 +18,7 @@ export async function getUsers(): Promise<UserResponse[]> {
     throw new Error(err.response?.data?.message || 'Failed to get users');
   }
 }
-// Get current logged-in user profile
+
 export async function getCurrentUser(): Promise<UserProfile> {
   try {
     const res = await api.get<UserProfile>('/Users/GetCurrentUser');
@@ -27,7 +28,6 @@ export async function getCurrentUser(): Promise<UserProfile> {
   }
 }
 
-// Update the changePassword function in users.ts
 export async function changePassword(
   userId: string,
   currentPassword: string,
@@ -58,7 +58,6 @@ export async function changePassword(
     let errorMessage = 'Password change failed';
     
     if (err.response) {
-      // Get detailed error message if available
       errorMessage = err.response.data?.message || 
                      err.response.data?.title || 
                      `Error: ${err.response.status} ${err.response.statusText}`;
@@ -69,7 +68,7 @@ export async function changePassword(
     throw new Error(errorMessage);
   }
 }
-// Update the updateProfileImage function in users.ts
+
 export async function updateProfileImage(userId: string, imageFile: File): Promise<void> {
   try {
     const formData = new FormData();
@@ -104,7 +103,6 @@ export async function updateProfileImage(userId: string, imageFile: File): Promi
   }
 }
 
-// Define the extended user profile type
 export interface UserProfile extends UserResponse {
   phone?: string;
   bio?: string;
@@ -116,9 +114,37 @@ export interface UserProfile extends UserResponse {
   linkedinUrl?: string;
   instagramUrl?: string;
 }
+
 export async function createUser(data: CreateUserCommand): Promise<AuthResponse> {
   try {
-    const res = await api.post<AuthResponse>('/Users/CreateUser', data);
+    // If data is already FormData, use it directly
+    if (data instanceof FormData) {
+      const res = await api.post<AuthResponse>('/Users/CreateUser', data, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+      return res.data;
+    }
+    
+    // Otherwise, create FormData from the object
+    const formData = new FormData();
+    formData.append('Email', data.email || '');
+    formData.append('Password', data.password || '');
+    formData.append('FullName', data.fullName || '');
+    formData.append('Role', data.role || 'User');
+    
+    // Handle profile picture if it exists
+    if (data.profilePicture instanceof File) {
+      formData.append('ProfilePicture', data.profilePicture);
+    }
+    
+    const res = await api.post<AuthResponse>('/Users/CreateUser', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    });
+    
     return res.data;
   } catch (err: any) {
     throw new Error(err.response?.data?.message || 'User creation failed');
@@ -146,8 +172,15 @@ export async function updateUser(data: UpdateUserCommand): Promise<UserResponse>
       }
     });
     
-    // Update localStorage with new fullName
-    localStorage.setItem('fullName', data.fullName || '');
+    // If updating the currently logged-in user, update localStorage
+    const currentUserId = localStorage.getItem('userId');
+    if (currentUserId === data.userId) {
+      localStorage.setItem('fullName', data.fullName || '');
+      // If user role is changed, update that too
+      if (data.role) {
+        localStorage.setItem('roles', JSON.stringify([data.role]));
+      }
+    }
     
     return res.data;
   } catch (err: any) {
@@ -163,7 +196,6 @@ export async function deleteUser(userId: string): Promise<void> {
   }
 }
 
-// This function can be used for registration
 export async function register(data: {
   fullName: string;
   email: string;
@@ -174,14 +206,11 @@ export async function register(data: {
       email: data.email,
       password: data.password,
       fullName: data.fullName,
-      role: 'User' // Default role, adjust as needed
+      role: 'User' // Default role
     };
     const res = await createUser(userData);
-    console.log("responseRegister: " , res);
     return res;
   } catch (err: any) {
     throw new Error(err.response?.data?.message || 'Registration failed');
   }
-
-  
 }

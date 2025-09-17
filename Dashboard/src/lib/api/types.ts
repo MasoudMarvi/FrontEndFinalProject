@@ -157,6 +157,7 @@ export interface CreateUserCommand {
   password: string | null;
   fullName: string | null;
   role: string | null;
+  profilePicture?: File;
 }
 
 export interface UpdateUserCommand {
