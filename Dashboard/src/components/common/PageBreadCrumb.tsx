@@ -1,13 +1,34 @@
 "use client";
 import Link from "next/link";
-import React from "react";
+import React, { useEffect, useState } from "react";
 
 interface BreadcrumbProps {
   pageTitle: string;
   Url?: string;
 }
 
-const PageBreadcrumb: React.FC<BreadcrumbProps> = ({ pageTitle,Url }) => {
+const PageBreadcrumb: React.FC<BreadcrumbProps> = ({ pageTitle, Url }) => {
+  const [dashboardUrl, setDashboardUrl] = useState<string>('/user-dashboard'); // Default to user dashboard
+
+  useEffect(() => {
+    // Check user role from localStorage when component mounts
+    if (typeof window !== 'undefined') {
+      try {
+        const userRoles = JSON.parse(localStorage.getItem('roles') || '[]');
+        
+        // Check if the user has admin role
+        const isAdmin = Array.isArray(userRoles) && 
+          userRoles.some((role: string) => role.toLowerCase() === 'admin');
+        
+        // Set the appropriate dashboard URL based on role
+        setDashboardUrl(isAdmin ? '/admin-dashboard' : '/user-dashboard');
+      } catch (error) {
+        console.error('Error checking user role:', error);
+        setDashboardUrl('/user-dashboard'); // Fallback to user dashboard
+      }
+    }
+  }, []);
+
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
       <h2
@@ -21,7 +42,7 @@ const PageBreadcrumb: React.FC<BreadcrumbProps> = ({ pageTitle,Url }) => {
           <li>
             <Link
               className="inline-flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400"
-              href={Url || '/admin-dashboard'}
+              href={Url || dashboardUrl}
             >
               Home
               <svg
