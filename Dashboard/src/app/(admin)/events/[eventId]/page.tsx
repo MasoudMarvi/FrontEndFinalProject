@@ -24,14 +24,13 @@ const containerStyle = {
 // Environmental data type mapping
 const getEnvironmentalTypeLabel = (type: number): string => {
   const typeMap: { [key: number]: string } = {
-    0: 'Temperature',
-    1: 'Humidity',
-    2: 'Air Quality',
-    3: 'Noise Level',
-    4: 'UV Index',
+    0: 'Air Quality',
+    1: 'Noise Level',
+    2: 'Water Quality',
+    3: 'Temperature',
+    4: 'Humidity',
     5: 'Wind Speed',
-    6: 'Pressure',
-    7: 'Precipitation'
+    6: 'Other'
   };
   return typeMap[type] || `Type ${type}`;
 };
@@ -39,14 +38,13 @@ const getEnvironmentalTypeLabel = (type: number): string => {
 // Get icon for environmental data type
 const getEnvironmentalIcon = (type: number): string => {
   const iconMap: { [key: number]: string } = {
-    0: '🌡️', // Temperature
-    1: '💧', // Humidity
-    2: '🌬️', // Air Quality
-    3: '🔊', // Noise Level
-    4: '☀️', // UV Index
+    0: '🌬️', // Air Quality
+    1: '🔊', // Noise Level
+    2: '💧', // WaterQuality
+    3: '🌡️', // Temperature
+    4: '💧', // Humidity
     5: '💨', // Wind Speed
-    6: '📊', // Pressure
-    7: '🌧️'  // Precipitation
+    6: '📊', // Other
   };
   return iconMap[type] || '📈';
 };
