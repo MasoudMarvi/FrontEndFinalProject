@@ -95,6 +95,7 @@ const EventsMap = () => {
   const [selectedEvent, setSelectedEvent] = useState<MapEventData | null>(null);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | 'all'>('all');
   const [events, setEvents] = useState<MapEventData[]>([]);
+  const [filteredEvents, setFilteredEvents] = useState<MapEventData[]>([]); // New state for filtered events
   const [categories, setCategories] = useState<EventCategoryDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -165,6 +166,18 @@ const EventsMap = () => {
 
     fetchEvents();
   }, [selectedCategoryId]);
+
+  // Filter events to only show Active status events
+  useEffect(() => {
+    // Filter to only show active events
+    const activeEvents = events.filter(event => event.status === EventStatus.Active);
+    setFilteredEvents(activeEvents);
+    
+    // If the selected event is not active, deselect it
+    if (selectedEvent && selectedEvent.status !== EventStatus.Active) {
+      setSelectedEvent(null);
+    }
+  }, [events]);
 
   // Initialize autocomplete when Maps API is loaded
   useEffect(() => {
@@ -257,10 +270,10 @@ const EventsMap = () => {
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">
-              Events Map
+              Active Events Map
             </h3>
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              Discover events happening near you
+              Discover active events happening near you
             </p>
           </div>
           <div className="w-full sm:w-64">
@@ -317,7 +330,7 @@ const EventsMap = () => {
           },
         }}
       >
-        {!loading && events.map(event => (
+        {!loading && filteredEvents.map(event => (
           <Marker
             key={event.id}
             position={event.location}
@@ -397,16 +410,17 @@ const EventsMap = () => {
         ))}
       </div>
       
-      {/* Status Legend */}
+      {/* Status info - only show Active since we're filtering */}
       <div className="flex flex-wrap items-center gap-3 mt-2 px-2">
         <span className="text-sm text-gray-500 dark:text-gray-400">Status:</span>
-        {[EventStatus.Pending, EventStatus.Active, EventStatus.Cancelled].map((status) => (
-          <div key={status} className="flex items-center gap-1">
-            <span className={`inline-block px-2 py-0.5 text-xs font-semibold rounded-full ${getStatusColor(status)}`}>
-              {getStatusDisplay(status)}
-            </span>
-          </div>
-        ))}
+        <div className="flex items-center gap-1">
+          <span className={`inline-block px-2 py-0.5 text-xs font-semibold rounded-full ${getStatusColor(EventStatus.Active)}`}>
+            Active
+          </span>
+        </div>
+        <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">
+          Showing {filteredEvents.length} active events out of {events.length} total events
+        </span>
       </div>
       
       {/* Loading indicator for events */}
