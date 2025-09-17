@@ -1,9 +1,77 @@
 "use client";
-import React from "react";
-import Badge from "../ui/badge/Badge";
-import { ArrowDownIcon, ArrowUpIcon, BoxIconLine, GroupIcon } from "@/icons";
+import React, { useEffect, useState } from "react";
+import { GroupIcon } from "@/icons";
+import { getStats } from "@/lib/api/stats";
+
+// Define the Stats interface based on the API response
+interface Stats {
+  totalEvents: number;
+  totalEventsPending: number;
+  totalEventsActive: number;
+  totalEventsCancelled: number;
+  totalUsers: number;
+  totalAdmins: number;
+  totalRegularUsers: number;
+  totalCategories: number;
+  topCategories: {
+    categoryId: string;
+    categoryName: string;
+    description: string;
+    events: any[];
+  }[];
+  totalChatMessages: number;
+  totalChatMessagesToday: number;
+  totalChatMessagesThisWeek: number;
+  totalChatMessagesThisMonth: number;
+}
 
 export const EcommerceMetrics = () => {
+  const [stats, setStats] = useState<Stats | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Color array for category indicators
+  const categoryColors = ["bg-red-500", "bg-blue-500", "bg-green-500"];
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const data = await getStats();
+        setStats(data);
+        setLoading(false);
+      } catch (err) {
+        console.error("Error fetching stats:", err);
+        setError("Failed to load statistics");
+        setLoading(false);
+      }
+    };
+
+    fetchStats();
+  }, []);
+
+  if (loading) {
+    return <div className="w-full p-6 text-center">Loading statistics...</div>;
+  }
+
+  if (error) {
+    return <div className="w-full p-6 text-center text-red-500">{error}</div>;
+  }
+
+  // Get top 3 categories
+  const getTopCategories = () => {
+    if (!stats || !stats.topCategories || stats.topCategories.length === 0) {
+      return [];
+    }
+    
+    // Get up to 3 top categories
+    return stats.topCategories.slice(0, 3).map((category, index) => ({
+      name: category.categoryName || "Unknown",
+      color: categoryColors[index] || "bg-gray-500"
+    }));
+  };
+
+  const topCategories = getTopCategories();
+
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4 md:gap-6">
       {/* <!-- User Metrics Item --> */}
@@ -18,23 +86,23 @@ export const EcommerceMetrics = () => {
               Total Users
             </span>
             <h4 className="mt-2 font-bold text-gray-800 text-title-sm dark:text-white/90">
-              3,782
+              {stats?.totalUsers || 0}
             </h4>
           </div>
-          <Badge color="success">
-            <ArrowUpIcon />
-            11.01%
-          </Badge>
         </div>
 
         <div className="flex flex-col gap-1 mt-4">
           <div className="flex justify-between items-center text-sm">
-            <span className="text-gray-500 dark:text-gray-400">Online</span>
-            <span className="font-medium text-gray-800 dark:text-white/90">248</span>
+            <span className="text-gray-500 dark:text-gray-400">Admins</span>
+            <span className="font-medium text-gray-800 dark:text-white/90">
+              {stats?.totalAdmins || 0}
+            </span>
           </div>
           <div className="flex justify-between items-center text-sm">
-            <span className="text-gray-500 dark:text-gray-400">Guest Users</span>
-            <span className="font-medium text-gray-800 dark:text-white/90">1,253</span>
+            <span className="text-gray-500 dark:text-gray-400">Regular Users</span>
+            <span className="font-medium text-gray-800 dark:text-white/90">
+              {stats?.totalRegularUsers || 0}
+            </span>
           </div>
         </div>
       </div>
@@ -42,7 +110,6 @@ export const EcommerceMetrics = () => {
       {/* <!-- Events Metrics Item --> */}
       <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] md:p-6">
         <div className="flex items-center justify-center w-12 h-12 bg-gray-100 rounded-xl dark:bg-gray-800">
-          {/* Using inline SVG for calendar icon */}
           <svg xmlns="http://www.w3.org/2000/svg" className="size-6 text-gray-800 dark:text-white/90" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
             <line x1="16" y1="2" x2="16" y2="6"></line>
@@ -56,24 +123,29 @@ export const EcommerceMetrics = () => {
               Total Events
             </span>
             <h4 className="mt-2 font-bold text-gray-800 text-title-sm dark:text-white/90">
-              5,359
+              {stats?.totalEvents || 0}
             </h4>
           </div>
-
-          <Badge color="success">
-            <ArrowUpIcon />
-            15.25%
-          </Badge>
         </div>
 
         <div className="flex flex-col gap-1 mt-4">
           <div className="flex justify-between items-center text-sm">
-            <span className="text-gray-500 dark:text-gray-400">Upcoming</span>
-            <span className="font-medium text-gray-800 dark:text-white/90">3,124</span>
+            <span className="text-gray-500 dark:text-gray-400">Pending</span>
+            <span className="font-medium text-gray-800 dark:text-white/90">
+              {stats?.totalEventsPending || 0}
+            </span>
+          </div>
+          <div className="flex justify-between items-center text-sm">
+            <span className="text-gray-500 dark:text-gray-400">Active</span>
+            <span className="font-medium text-gray-800 dark:text-white/90">
+              {stats?.totalEventsActive || 0}
+            </span>
           </div>
           <div className="flex justify-between items-center text-sm">
             <span className="text-gray-500 dark:text-gray-400">Cancelled</span>
-            <span className="font-medium text-gray-800 dark:text-white/90">247</span>
+            <span className="font-medium text-gray-800 dark:text-white/90">
+              {stats?.totalEventsCancelled || 0}
+            </span>
           </div>
         </div>
       </div>
@@ -94,39 +166,29 @@ export const EcommerceMetrics = () => {
             Top Categories
           </span>
           <h4 className="mt-2 font-bold text-gray-800 text-title-sm dark:text-white/90">
-            5 Categories
+            Top 3 Categories
           </h4>
         </div>
 
         <div className="flex flex-col gap-2 mt-4">
-          <div className="flex justify-between items-center">
-            <div className="flex items-center gap-2">
-              <span className="block h-3 w-3 rounded-full bg-red-500"></span>
-              <span className="text-sm text-gray-600 dark:text-gray-300">Music</span>
-            </div>
-            <span className="text-sm font-medium">35%</span>
-          </div>
-          <div className="flex justify-between items-center">
-            <div className="flex items-center gap-2">
-              <span className="block h-3 w-3 rounded-full bg-blue-500"></span>
-              <span className="text-sm text-gray-600 dark:text-gray-300">Technology</span>
-            </div>
-            <span className="text-sm font-medium">25%</span>
-          </div>
-          <div className="flex justify-between items-center">
-            <div className="flex items-center gap-2">
-              <span className="block h-3 w-3 rounded-full bg-green-500"></span>
-              <span className="text-sm text-gray-600 dark:text-gray-300">Food</span>
-            </div>
-            <span className="text-sm font-medium">15%</span>
-          </div>
+          {topCategories.length > 0 ? (
+            topCategories.map((category, index) => (
+              <div className="flex items-center gap-2" key={index}>
+                <span className={`block h-3 w-3 rounded-full ${category.color}`}></span>
+                <span className="text-sm text-gray-600 dark:text-gray-300">
+                  {category.name}
+                </span>
+              </div>
+            ))
+          ) : (
+            <div className="text-sm text-gray-500 dark:text-gray-400">No categories available</div>
+          )}
         </div>
       </div>
 
-      {/* <!-- User Engagement Item --> */}
+      {/* <!-- Chat Messages Item --> */}
       <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] md:p-6">
         <div className="flex items-center justify-center w-12 h-12 bg-gray-100 rounded-xl dark:bg-gray-800">
-          {/* Using inline SVG for chat icon */}
           <svg xmlns="http://www.w3.org/2000/svg" className="size-6 text-gray-800 dark:text-white/90" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
           </svg>
@@ -138,23 +200,29 @@ export const EcommerceMetrics = () => {
               Chat Messages
             </span>
             <h4 className="mt-2 font-bold text-gray-800 text-title-sm dark:text-white/90">
-              12,845
+              {stats?.totalChatMessages || 0}
             </h4>
           </div>
-          <Badge color="success">
-            <ArrowUpIcon />
-            23.9%
-          </Badge>
         </div>
 
         <div className="flex flex-col gap-1 mt-4">
           <div className="flex justify-between items-center text-sm">
             <span className="text-gray-500 dark:text-gray-400">Today</span>
-            <span className="font-medium text-gray-800 dark:text-white/90">843</span>
+            <span className="font-medium text-gray-800 dark:text-white/90">
+              {stats?.totalChatMessagesToday || 0}
+            </span>
           </div>
           <div className="flex justify-between items-center text-sm">
-            <span className="text-gray-500 dark:text-gray-400">Active Chats</span>
-            <span className="font-medium text-gray-800 dark:text-white/90">32</span>
+            <span className="text-gray-500 dark:text-gray-400">This Week</span>
+            <span className="font-medium text-gray-800 dark:text-white/90">
+              {stats?.totalChatMessagesThisWeek || 0}
+            </span>
+          </div>
+          <div className="flex justify-between items-center text-sm">
+            <span className="text-gray-500 dark:text-gray-400">This Month</span>
+            <span className="font-medium text-gray-800 dark:text-white/90">
+              {stats?.totalChatMessagesThisMonth || 0}
+            </span>
           </div>
         </div>
       </div>
