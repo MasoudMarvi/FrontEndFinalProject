@@ -1,7 +1,6 @@
 "use client";
 import React, { useState, useCallback, useEffect } from "react";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
 import Input from "@/components/form/input/InputField";
 import Label from "@/components/form/Label";
 import TextArea from "@/components/form/input/TextArea";
@@ -13,10 +12,17 @@ import { useGoogleMaps } from "@/context/GoogleMapsContext";
 import { getEventCategories } from "@/lib/api/eventCategories";
 import { createEvent } from "@/lib/api/events";
 import { EventCategoryDto, EventStatus } from "@/lib/api/types";
+import { Modal } from "@/components/ui/modal";
+import { useModal } from "@/hooks/useModal";
+import Button from "@/components/ui/button/Button";
 
 export default function CreateEventForm() {
-  const router = useRouter();
+  const { isOpen: isNotificationOpen, openModal: openNotification, closeModal: closeNotification } = useModal();
   const { isLoaded } = useGoogleMaps();
+  
+  // State for user role
+  const [userRole, setUserRole] = useState<string>("");
+  const [isAdmin, setIsAdmin] = useState(false);
   
   // State for images (supporting 3 images)
   const [imageFiles, setImageFiles] = useState<(File | null)[]>([null, null, null]);
@@ -39,6 +45,7 @@ export default function CreateEventForm() {
   // Form feedback
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [notificationMessage, setNotificationMessage] = useState("");
   
   // Categories from API
   const [categories, setCategories] = useState<EventCategoryDto[]>([]);
@@ -53,6 +60,31 @@ export default function CreateEventForm() {
     clickableIcons: true,
     scrollwheel: true,
   };
+  
+  // Check user role on component mount
+  useEffect(() => {
+    // Get user roles from localStorage
+    const userRoles = localStorage.getItem('roles');
+    if (userRoles) {
+      try {
+        const roles = JSON.parse(userRoles);
+        setUserRole(Array.isArray(roles) ? roles[0] : roles);
+        // Check if user is admin (case-insensitive)
+        const adminRole = Array.isArray(roles) ? 
+          roles.some(role => typeof role === 'string' && role.toLowerCase() === 'admin') :
+          (typeof roles === 'string' && roles.toLowerCase() === 'admin');
+        
+        setIsAdmin(adminRole);
+        
+        // If user is not admin, set status to Pending by default
+        if (!adminRole) {
+          setStatus(EventStatus.Pending);
+        }
+      } catch (error) {
+        console.error("Error parsing user roles:", error);
+      }
+    }
+  }, []);
   
   // Fetch categories on component mount
   useEffect(() => {
@@ -128,6 +160,23 @@ export default function CreateEventForm() {
     setImagePreviews(newImagePreviews);
   };
   
+  // Reset the form after successful submission
+  const resetForm = () => {
+    setTitle("");
+    setDescription("");
+    setCategoryId(categories.length > 0 ? categories[0].categoryId : "");
+    setStartDate("");
+    setStartTime("");
+    setEndDate("");
+    setEndTime("");
+    setLocation(null);
+    setLocationName("");
+    setIsPublic(false);
+    setStatus(EventStatus.Pending);
+    setImageFiles([null, null, null]);
+    setImagePreviews([null, null, null]);
+  };
+  
   // Form submission handler
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -147,6 +196,9 @@ export default function CreateEventForm() {
     setLoading(true);
     
     try {
+      // For non-admin users, always set status to Pending
+      const eventStatus = isAdmin ? status : EventStatus.Pending;
+      
       // Prepare the event data according to the updated API schema
       const formData = new FormData();
       
@@ -159,7 +211,7 @@ export default function CreateEventForm() {
       formData.append('EndDateTime', endDateTime);
       formData.append('IsPublic', isPublic.toString());
       formData.append('CategoryId', categoryId);
-      formData.append('Status', status.toString());
+      formData.append('Status', eventStatus.toString());
       
       // Add images if available
       if (imageFiles[0]) {
@@ -184,24 +236,29 @@ export default function CreateEventForm() {
         endDateTime,
         isPublic,
         categoryId,
-        status,
+        status: eventStatus,
         picture1: imageFiles[0] || undefined,
         picture2: imageFiles[1] || undefined,
         picture3: imageFiles[2] || undefined
       });
       
-      setSuccessMessage("Event created successfully!");
+      // Show success notification modal
+      setNotificationMessage(`Event "${title}" created successfully!`);
+      openNotification();
       
-      // Redirect after a short delay
-      setTimeout(() => {
-        router.push("/admin-dashboard/manage-events");
-      }, 1500);
+      // Reset form for a new event
+      resetForm();
     } catch (error: any) {
       console.error("Error creating event:", error);
       setErrorMessage(error.message || "Failed to create event");
     } finally {
       setLoading(false);
     }
+  };
+
+  // Handle notification close and form reset
+  const handleNotificationClose = () => {
+    closeNotification();
   };
 
   return (
@@ -342,22 +399,39 @@ export default function CreateEventForm() {
             </Select>
           </div>
 
-          {/* Event Status */}
-          <div>
-            <Label htmlFor="eventStatus">
-              Status
-            </Label>
-            <Select
-              id="eventStatus"
-              className="w-full"
-              value={status.toString()}
-              onChange={(e) => setStatus(parseInt(e.target.value) as EventStatus)}
-            >
-              <option value={EventStatus.Pending.toString()}>Pending</option>
-              <option value={EventStatus.Active.toString()}>Active</option>
-              <option value={EventStatus.Cancelled.toString()}>Cancelled</option>
-            </Select>
-          </div>
+          {/* Event Status - Only visible and editable for admin users */}
+          {isAdmin && (
+            <div>
+              <Label htmlFor="eventStatus">
+                Status
+              </Label>
+              <Select
+                id="eventStatus"
+                className="w-full"
+                value={status.toString()}
+                onChange={(e) => setStatus(parseInt(e.target.value) as EventStatus)}
+              >
+                <option value={EventStatus.Pending.toString()}>Pending</option>
+                <option value={EventStatus.Active.toString()}>Active</option>
+                <option value={EventStatus.Cancelled.toString()}>Cancelled</option>
+              </Select>
+            </div>
+          )}
+          {!isAdmin && (
+            <div>
+              <Label htmlFor="eventStatus">
+                Status
+              </Label>
+              <div className="mt-1 flex items-center">
+                <div className="bg-yellow-100 text-yellow-800 px-3 py-2 rounded-md text-sm font-medium dark:bg-yellow-900/30 dark:text-yellow-300">
+                  Pending (Requires admin approval)
+                </div>
+              </div>
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                New events are set to pending status until approved by an administrator.
+              </p>
+            </div>
+          )}
           
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
             {/* Start Date */}
@@ -450,7 +524,7 @@ export default function CreateEventForm() {
           </div>
           
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-            {/* Latitude */}
+            {/* Latitude - Read-only */}
             <div>
               <Label htmlFor="latitude">
                 Latitude <span className="text-error-500">*</span>
@@ -458,14 +532,15 @@ export default function CreateEventForm() {
               <Input 
                 id="latitude"
                 type="text" 
-                placeholder="e.g. 37.7749"
+                placeholder="Select a location on the map"
                 value={location?.lat?.toString() || ""}
-                onChange={(e) => setLocation(prev => ({ lat: parseFloat(e.target.value), lng: prev?.lng || 0 }))}
+                readOnly={true}
+                className="bg-gray-50 cursor-not-allowed dark:bg-gray-800"
                 required
               />
             </div>
             
-            {/* Longitude */}
+            {/* Longitude - Read-only */}
             <div>
               <Label htmlFor="longitude">
                 Longitude <span className="text-error-500">*</span>
@@ -473,9 +548,10 @@ export default function CreateEventForm() {
               <Input 
                 id="longitude"
                 type="text" 
-                placeholder="e.g. -122.4194"
+                placeholder="Select a location on the map"
                 value={location?.lng?.toString() || ""}
-                onChange={(e) => setLocation(prev => ({ lat: prev?.lat || 0, lng: parseFloat(e.target.value) }))}
+                readOnly={true}
+                className="bg-gray-50 cursor-not-allowed dark:bg-gray-800"
                 required
               />
             </div>
@@ -489,7 +565,7 @@ export default function CreateEventForm() {
             <Input 
               id="locationName"
               type="text" 
-              placeholder="e.g. Golden Gate Park"
+              placeholder="e.g. Azadi Tower"
               value={locationName}
               onChange={(e) => setLocationName(e.target.value)}
             />
@@ -527,6 +603,36 @@ export default function CreateEventForm() {
           </div>
         </form>
       </div>
+
+      {/* Success Notification Modal */}
+      <Modal isOpen={isNotificationOpen} onClose={closeNotification} className="max-w-md m-4">
+        <div className="no-scrollbar relative w-full max-w-md overflow-y-auto rounded-3xl bg-white p-6 dark:bg-gray-900">
+          <div className="flex items-center">
+            <div className="flex-shrink-0 bg-green-100 rounded-full p-2 dark:bg-green-800/30">
+              <svg className="h-6 w-6 text-green-600 dark:text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <div className="ml-4">
+              <h3 className="text-lg font-medium text-green-800 dark:text-green-300">
+                Success
+              </h3>
+              <p className="mt-2 text-sm text-green-700 dark:text-green-400">
+                {notificationMessage}
+              </p>
+            </div>
+          </div>
+          <div className="mt-6 flex justify-end">
+            <Button 
+              size="sm" 
+              onClick={handleNotificationClose}
+              className="bg-green-500 hover:bg-green-600 text-white"
+            >
+              Create Another Event
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </>
   );
 }
