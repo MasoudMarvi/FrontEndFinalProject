@@ -1,4 +1,3 @@
-// src/app/(admin)/admin-dashboard/page.tsx
 "use client";
 import React, { useState, useEffect } from "react";
 import EventsMap from "@/components/maps/EventsMap";
@@ -8,7 +7,6 @@ import Link from "next/link";
 import { aboutApi, AboutDto } from "@/lib/api";
 
 export default function AdminDashboard() {
-  // About Us management state
   const [isAboutUsModalOpen, setIsAboutUsModalOpen] = useState(false);
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
@@ -17,7 +15,6 @@ export default function AdminDashboard() {
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  // Fetch About Us data when modal opens
   const handleOpenAboutModal = async () => {
     setIsAboutUsModalOpen(true);
     setError(null);
@@ -48,7 +45,6 @@ export default function AdminDashboard() {
       await aboutApi.createOrUpdateAbout(title, content);
       setSuccessMessage('About Us information has been updated successfully.');
       
-      // Keep modal open to show success message
       setTimeout(() => {
         if (successMessage) {
           setIsAboutUsModalOpen(false);

@@ -14,7 +14,6 @@ import { GoogleMap, Marker } from '@react-google-maps/api';
 import { useGoogleMaps } from "@/context/GoogleMapsContext";
 import axios from "axios";
 
-// Define the TypeScript interface for the events from the API based on Swagger docs
 interface EventDto {
   eventId: string;
   title: string;
@@ -34,7 +33,6 @@ interface EventDto {
   status: EventStatus;
 }
 
-// Interface for edit form with additional fields
 interface EventEditForm extends EventDto {
   picture1File?: File | null;
   picture2File?: File | null;
@@ -47,21 +45,18 @@ interface EventEditForm extends EventDto {
   organizer?: string;
 }
 
-// Event status enum based on Swagger
 enum EventStatus {
   Pending = 0,
   Active = 1,
   Completed = 2
 }
 
-// Category interface
 interface EventCategoryDto {
   categoryId: string;
   categoryName: string;
   description: string | null;
 }
 
-// Status mapping for display purposes
 const getStatusBadge = (status: EventStatus) => {
   switch (status) {
     case EventStatus.Pending:
@@ -75,18 +70,14 @@ const getStatusBadge = (status: EventStatus) => {
   }
 };
 
-// Default images
 const DEFAULT_IMAGE = "/images/event/event-default.jpg";
 
-// API base URL
 const API_BASE_URL = "https://localhost:7235/api";
 
-// Create axios instance with default config
 const api = axios.create({
   baseURL: API_BASE_URL
 });
 
-// Add request interceptor to add authorization header
 api.interceptors.request.use(config => {
   const token = localStorage.getItem('accessToken');
   if (token) {
@@ -95,7 +86,6 @@ api.interceptors.request.use(config => {
   return config;
 });
 
-// Helper function to get image URL
 const getImageUrl = (path: string | null) => {
   if (!path) return DEFAULT_IMAGE;
   if (path.startsWith('http') || path.startsWith('data:')) return path;
@@ -116,17 +106,14 @@ export default function MyEventsList() {
     visible: boolean;
   }>({ message: '', type: 'success', visible: false });
   
-  // User role state
   const [isAdmin, setIsAdmin] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
   
-  // Map refs and state
   const mapRef = useRef<google.maps.Map | null>(null);
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   
-  // Edit modal state
   const [isEditModalOpen, setIsEditModalOpen] = useState<boolean>(false);
   const [editingEvent, setEditingEvent] = useState<EventEditForm | null>(null);
   const [startDate, setStartDate] = useState<string>("");
@@ -134,16 +121,13 @@ export default function MyEventsList() {
   const [endDate, setEndDate] = useState<string>("");
   const [endTime, setEndTime] = useState<string>("");
   
-  // Check user role and fetch data on component mount
   useEffect(() => {
-    // Get user info from localStorage
     const userRoles = localStorage.getItem('roles');
     const storedUserId = localStorage.getItem('userId');
     
     if (userRoles) {
       try {
         const roles = JSON.parse(userRoles);
-        // Check if user is admin (case-insensitive)
         const adminRole = Array.isArray(roles) ? 
           roles.some(role => typeof role === 'string' && role.toLowerCase() === 'admin') :
           (typeof roles === 'string' && roles.toLowerCase() === 'admin');
@@ -159,19 +143,16 @@ export default function MyEventsList() {
       fetchUserEvents(storedUserId);
     }
     
-    // Fetch categories for the dropdown
     fetchCategories();
   }, []);
   
-  // Fetch events created by the current user
   const fetchUserEvents = async (userId: string) => {
     setLoading(true);
     try {
-      // Use the official API endpoint with userId as a query parameter
       const response = await api.get('/Events', { 
         params: { 
           userId: userId,
-          includePrivate: true  // Include private events since these are the user's own events
+          includePrivate: true 
         }
       });
       
@@ -180,26 +161,22 @@ export default function MyEventsList() {
       console.error("Error fetching user events:", err);
       setError(err.response?.data?.message || "Failed to fetch events. Please try again later.");
       
-      // Fallback to empty array if API call fails
       setEvents([]);
     } finally {
       setLoading(false);
     }
   };
   
-  // Fetch categories
   const fetchCategories = async () => {
     try {
       const response = await api.get('/EventCategories');
       setCategories(response.data);
     } catch (err) {
       console.error("Error fetching categories:", err);
-      // Set fallback categories
       setCategories([]);
     }
   };
   
-  // Initialize autocomplete when Maps API is loaded
   useEffect(() => {
     if (isLoaded && isEditModalOpen && searchInputRef.current && window.google && window.google.maps && window.google.maps.places) {
       try {
@@ -210,12 +187,10 @@ export default function MyEventsList() {
         
         autocompleteRef.current = autocomplete;
         
-        // If map is already loaded, bind to it
         if (mapRef.current) {
           autocomplete.bindTo("bounds", mapRef.current);
         }
         
-        // Add listener for place selection
         const listener = autocomplete.addListener("place_changed", () => {
           const place = autocomplete.getPlace();
           
@@ -226,11 +201,9 @@ export default function MyEventsList() {
           
           if (!editingEvent) return;
           
-          // Get location coordinates
           const lat = place.geometry.location.lat();
           const lng = place.geometry.location.lng();
           
-          // Update location in editing event
           setEditingEvent({
             ...editingEvent,
             location: {
@@ -241,14 +214,12 @@ export default function MyEventsList() {
             }
           });
           
-          // Update the map
           if (mapRef.current) {
             mapRef.current.panTo({ lat, lng });
             mapRef.current.setZoom(15);
           }
         });
         
-        // Clean up listener on unmount
         return () => {
           if (google && google.maps && google.maps.event && listener) {
             google.maps.event.removeListener(listener);
@@ -261,17 +232,14 @@ export default function MyEventsList() {
     }
   }, [isLoaded, isEditModalOpen, searchInputRef.current, editingEvent]);
 
-  // Function to handle event deletion
   const handleDeleteEvent = async () => {
     if (!eventToDelete) return;
     
     try {
       await api.delete(`/Events/${eventToDelete}`);
       
-      // Update local state
       setEvents(prevEvents => prevEvents.filter(event => event.eventId !== eventToDelete));
       
-      // Show success notification
       showNotification("Event deleted successfully", "success");
     } catch (err: any) {
       console.error("Error deleting event:", err);
@@ -282,12 +250,10 @@ export default function MyEventsList() {
     }
   };
 
-  // Function to open edit modal
   const handleOpenEditModal = (eventId: string) => {
     const eventToEdit = events.find(event => event.eventId === eventId);
     if (!eventToEdit) return;
     
-    // Format the date and time from the event
     const startDateTime = new Date(eventToEdit.startDateTime);
     const endDateTime = new Date(eventToEdit.endDateTime);
     
@@ -296,11 +262,10 @@ export default function MyEventsList() {
     setEndDate(endDateTime.toISOString().split('T')[0]);
     setEndTime(endDateTime.toTimeString().slice(0, 5));
     
-    // Create edit form with additional fields needed for the modal
     setEditingEvent({
       ...eventToEdit,
       location: {
-        name: eventToEdit.description.substring(0, 30), // Using description as location name as it's not in the API
+        name: eventToEdit.description.substring(0, 30), 
         lat: eventToEdit.latitude,
         lng: eventToEdit.longitude,
       },
@@ -310,13 +275,11 @@ export default function MyEventsList() {
     setIsEditModalOpen(true);
   };
 
-  // Function to handle form input changes
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     if (!editingEvent) return;
     
     const { name, value } = e.target;
     
-    // Handle nested location properties
     if (name.startsWith('location.')) {
       const locationProp = name.split('.')[1];
       setEditingEvent({
@@ -334,7 +297,6 @@ export default function MyEventsList() {
     }
   };
 
-  // Handle map click to set marker and update coordinates
   const handleMapClick = (e: google.maps.MapMouseEvent) => {
     if (!editingEvent || !e.latLng) return;
     
@@ -351,33 +313,27 @@ export default function MyEventsList() {
     });
   };
 
-  // Map load handler
   const onMapLoad = (map: google.maps.Map) => {
     mapRef.current = map;
     
-    // Bind autocomplete to map bounds if it exists
     if (autocompleteRef.current && map) {
       autocompleteRef.current.bindTo("bounds", map);
     }
   };
 
-  // Handle search input change
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(e.target.value);
   };
 
-  // Function to handle form submission
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!editingEvent) return;
     
     try {
-      // Combine date and time
       const startDateTime = new Date(`${startDate}T${startTime}`);
       const endDateTime = new Date(`${endDate}T${endTime}`);
       
-      // Create form data for multipart/form-data request
       const formData = new FormData();
       formData.append('EventId', editingEvent.eventId);
       formData.append('Title', editingEvent.title);
@@ -389,12 +345,10 @@ export default function MyEventsList() {
       formData.append('IsPublic', editingEvent.isPublic.toString());
       formData.append('CategoryId', editingEvent.categoryId);
       
-      // Only admin can change status
       if (isAdmin) {
         formData.append('Status', editingEvent.status.toString());
       }
       
-      // Add image files if they exist
       if (editingEvent.picture1File) {
         formData.append('Picture1', editingEvent.picture1File);
       }
@@ -407,14 +361,12 @@ export default function MyEventsList() {
         formData.append('Picture3', editingEvent.picture3File);
       }
       
-      // Make API call to update the event
       const response = await api.put('/Events/UpdateEvent', formData, {
         headers: {
           'Content-Type': 'multipart/form-data'
         }
       });
       
-      // Update the event in the local state
       const updatedEvent = response.data;
       setEvents(prevEvents => 
         prevEvents.map(event => 
@@ -422,7 +374,6 @@ export default function MyEventsList() {
         )
       );
       
-      // Close modal and show success notification
       setIsEditModalOpen(false);
       showNotification("Event updated successfully", "success");
     } catch (err: any) {
@@ -431,7 +382,6 @@ export default function MyEventsList() {
     }
   };
 
-  // Function to show notification
   const showNotification = (message: string, type: 'success' | 'error') => {
     setNotification({ message, type, visible: true });
     setTimeout(() => {
@@ -439,7 +389,6 @@ export default function MyEventsList() {
     }, 3000);
   };
 
-  // Get the event image or use default
   const getEventImage = (event: EventDto) => {
     return getImageUrl(event.picture1) || getImageUrl(event.picture2) || getImageUrl(event.picture3);
   };
@@ -718,7 +667,7 @@ export default function MyEventsList() {
                 ></textarea>
               </div>
 
-              {/* Image Management - Using regular HTML img tags instead of Next.js Image */}
+              {}
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Event Images (Up to 3)

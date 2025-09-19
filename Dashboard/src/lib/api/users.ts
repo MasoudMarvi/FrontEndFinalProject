@@ -35,14 +35,12 @@ export async function changePassword(
   confirmPassword: string
 ): Promise<{success: boolean; message: string}> {
   try {
-    // Create FormData for the multipart/form-data request
     const formData = new FormData();
     formData.append('UserId', userId);
     formData.append('CurrentPassword', currentPassword);
     formData.append('NewPassword', newPassword);
     formData.append('ConfirmPassword', confirmPassword);
     
-    // Make the API request
     const response = await api.put('/Users/ChangePassword', formData, {
       headers: {
         'Content-Type': 'multipart/form-data'
@@ -54,7 +52,6 @@ export async function changePassword(
       message: 'Password changed successfully'
     };
   } catch (err: any) {
-    // Handle error responses
     let errorMessage = 'Password change failed';
     
     if (err.response) {
@@ -75,7 +72,6 @@ export async function updateProfileImage(userId: string, imageFile: File): Promi
     formData.append('ProfilePicture', imageFile);
     formData.append('UserId', userId);
     
-    // Get current user data to keep it intact
     const email = localStorage.getItem('email') || '';
     const fullName = localStorage.getItem('fullName') || '';
     const roles = JSON.parse(localStorage.getItem('roles') || '["User"]');
@@ -90,11 +86,9 @@ export async function updateProfileImage(userId: string, imageFile: File): Promi
       }
     });
     
-    // If the response includes a profile picture URL, update localStorage
     if (response.data && response.data.profilePictureUrl) {
       localStorage.setItem('profilePictureUrl', response.data.profilePictureUrl);
     } else {
-      // If not, use a URL pattern based on the user ID with a timestamp to avoid caching
       const profilePictureUrl = `https://localhost:7235/uploads/users/${userId}.jpg?t=${Date.now()}`;
       localStorage.setItem('profilePictureUrl', profilePictureUrl);
     }
@@ -130,30 +124,25 @@ export async function createUser(data: FormData): Promise<UserResponse> {
 
 export async function updateUser(data: UpdateUserCommand): Promise<UserResponse> {
   try {
-    // Create FormData for multipart/form-data request
     const formData = new FormData();
     formData.append('UserId', data.userId);
     formData.append('Email', data.email || '');
     formData.append('FullName', data.fullName || '');
     formData.append('Role', data.role || '');
     
-    // If there's a profile picture, add it
     if (data.profilePicture instanceof File) {
       formData.append('ProfilePicture', data.profilePicture);
     }
     
-    // Make the API request
     const res = await api.put<UserResponse>('/Users/UpdateUser', formData, {
       headers: {
         'Content-Type': 'multipart/form-data'
       }
     });
     
-    // If updating the currently logged-in user, update localStorage
     const currentUserId = localStorage.getItem('userId');
     if (currentUserId === data.userId) {
       localStorage.setItem('fullName', data.fullName || '');
-      // If user role is changed, update that too
       if (data.role) {
         localStorage.setItem('roles', JSON.stringify([data.role]));
       }

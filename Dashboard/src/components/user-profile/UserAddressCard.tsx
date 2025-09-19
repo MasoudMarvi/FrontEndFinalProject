@@ -11,7 +11,6 @@ export default function UserAddressCard() {
   const { isOpen, openModal, closeModal } = useModal();
   const { user, loading, error: authError, updateUserProfile } = useAuth();
 
-  // Form state
   const [formData, setFormData] = useState({
     country: '',
     city: '',
@@ -19,7 +18,6 @@ export default function UserAddressCard() {
     taxId: '',
   });
 
-  // Update form data when user data is loaded
   useEffect(() => {
     if (user) {
       setFormData({
@@ -59,7 +57,7 @@ export default function UserAddressCard() {
   }
 
   if (!user) {
-    return null; // Don't show this component if user is not logged in
+    return null;
   }
 
   return (

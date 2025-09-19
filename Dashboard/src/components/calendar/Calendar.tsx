@@ -39,7 +39,6 @@ const Calendar: React.FC = () => {
   };
 
   useEffect(() => {
-    // Initialize with favorite events (these would come from an API in a real app)
     setEvents([
       {
         id: "1",

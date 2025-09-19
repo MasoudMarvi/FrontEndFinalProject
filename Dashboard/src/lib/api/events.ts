@@ -35,10 +35,8 @@ export async function getEventById(eventId: string): Promise<EventDetailDto> {
 
 export async function createEvent(eventData: EventFormData): Promise<EventDto> {
   try {
-    // Convert to FormData for multipart/form-data request
     const formData = new FormData();
     
-    // Add all non-file fields
     formData.append('Title', eventData.title);
     formData.append('Description', eventData.description || '');
     formData.append('Latitude', eventData.latitude.toString());
@@ -48,12 +46,10 @@ export async function createEvent(eventData: EventFormData): Promise<EventDto> {
     formData.append('IsPublic', eventData.isPublic.toString());
     formData.append('CategoryId', eventData.categoryId);
     
-    // Add status if provided
     if (eventData.status !== undefined) {
       formData.append('Status', eventData.status.toString());
     }
     
-    // Add image files if provided
     if (eventData.picture1) {
       formData.append('Picture1', eventData.picture1);
     }
@@ -79,10 +75,8 @@ export async function createEvent(eventData: EventFormData): Promise<EventDto> {
 
 export async function updateEvent(eventData: EventFormData): Promise<EventDto> {
   try {
-    // Convert to FormData for multipart/form-data request
     const formData = new FormData();
     
-    // Add all non-file fields
     formData.append('EventId', eventData.eventId!); // eventId is required for updates
     formData.append('Title', eventData.title);
     formData.append('Description', eventData.description || '');
@@ -93,12 +87,10 @@ export async function updateEvent(eventData: EventFormData): Promise<EventDto> {
     formData.append('IsPublic', eventData.isPublic.toString());
     formData.append('CategoryId', eventData.categoryId);
     
-    // Add status if provided
     if (eventData.status !== undefined) {
       formData.append('Status', eventData.status.toString());
     }
     
-    // Add image files if provided
     if (eventData.picture1) {
       formData.append('Picture1', eventData.picture1);
     }

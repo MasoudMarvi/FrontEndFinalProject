@@ -4,10 +4,8 @@ import { AuthResponse, LoginCommand, RefreshTokenRequest } from './types';
 export async function login(data: LoginCommand): Promise<AuthResponse> {
   try {
     const res = await api.post<AuthResponse>('/Auth/login', data);
-    // Store the token in local storage or a cookie
     const { accessToken, refreshToken, userId, email, roles, fullName, profilePictureUrl } = res.data;
 
-    // Store tokens in localStorage
     localStorage.setItem('accessToken', accessToken);
     localStorage.setItem('refreshToken', refreshToken);
     localStorage.setItem('userId', userId);
@@ -15,7 +13,6 @@ export async function login(data: LoginCommand): Promise<AuthResponse> {
     localStorage.setItem('fullName', fullName);
     localStorage.setItem('roles', JSON.stringify(roles));
     
-    // Store profile picture URL if available
     if (profilePictureUrl) {
       localStorage.setItem('profilePictureUrl', profilePictureUrl);
     }
@@ -29,7 +26,6 @@ export async function login(data: LoginCommand): Promise<AuthResponse> {
 export async function refreshToken(data: RefreshTokenRequest): Promise<AuthResponse> {
   try {
     const res = await api.post<AuthResponse>('/Auth/refresh-token', data);
-    // Update stored tokens
     const { accessToken, refreshToken, userId, email, roles, fullName, profilePictureUrl } = res.data;
     localStorage.setItem('accessToken', accessToken);
     localStorage.setItem('refreshToken', refreshToken);
@@ -38,7 +34,6 @@ export async function refreshToken(data: RefreshTokenRequest): Promise<AuthRespo
     localStorage.setItem('fullName', fullName);
     localStorage.setItem('roles', JSON.stringify(roles));
     
-    // Update profile picture URL if available
     if (profilePictureUrl) {
       localStorage.setItem('profilePictureUrl', profilePictureUrl);
     }

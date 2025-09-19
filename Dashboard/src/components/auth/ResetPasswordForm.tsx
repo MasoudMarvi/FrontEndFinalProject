@@ -11,33 +11,26 @@ import { useRouter } from "next/navigation";
 export default function ResetPasswordPage() {
   const router = useRouter();
   
-  // Form states
   const [email, setEmail] = useState("");
   const [verificationCode, setVerificationCode] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   
-  // Flow control states
-  const [currentStep, setCurrentStep] = useState(1); // 1: Email, 2: Verification Code, 3: New Password
+  const [currentStep, setCurrentStep] = useState(1); 
   const [error, setError] = useState("");
   const [isSuccess, setIsSuccess] = useState(false);
   
-  // Step 1: Request password reset code
   const handleRequestCode = (e: React.FormEvent) => {
     e.preventDefault();
-    // In a real app, this would send a verification code to the user's email
     console.log(`Sending verification code to ${email}`);
     
-    // Move to the next step
     setCurrentStep(2);
   };
   
-  // Step 2: Verify code and proceed to password reset
   const handleVerifyCode = (e: React.FormEvent) => {
     e.preventDefault();
     
-    // In a real app, this would verify the code against the backend
-    // For demo purposes, we'll accept any code
+  
     if (verificationCode.trim() === "") {
       setError("Please enter the verification code");
       return;
@@ -47,11 +40,9 @@ export default function ResetPasswordPage() {
     setCurrentStep(3);
   };
   
-  // Step 3: Set new password
   const handleResetPassword = (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Validate passwords
     if (newPassword !== confirmPassword) {
       setError("Passwords do not match");
       return;
@@ -64,13 +55,10 @@ export default function ResetPasswordPage() {
     
     setError("");
     
-    // In a real app, this would update the password in your backend
     console.log(`Resetting password for ${email}`);
     
-    // Show success message
     setIsSuccess(true);
     
-    // Redirect to sign in page after 3 seconds
     setTimeout(() => {
       router.push("/signin");
     }, 3000);

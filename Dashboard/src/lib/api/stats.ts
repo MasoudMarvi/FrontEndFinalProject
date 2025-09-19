@@ -18,7 +18,6 @@ export interface StatsDto {
       eventId: string;
       title: string;
       description: string;
-      // Other event properties...
     }>;
   }[];
   totalChatMessages: number;

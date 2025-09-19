@@ -16,12 +16,10 @@ export default function ManageCategories() {
   const [newCategoryDescription, setNewCategoryDescription] = useState("");
   const [successMessage, setSuccessMessage] = useState<{message: string, type: 'create' | 'edit' | 'delete'} | null>(null);
 
-  // Fetch categories on component mount
   useEffect(() => {
     fetchCategories();
   }, []);
 
-  // Auto-hide success message after 5 seconds
   useEffect(() => {
     if (successMessage) {
       const timer = setTimeout(() => {
@@ -79,13 +77,11 @@ export default function ManageCategories() {
     e.preventDefault();
     
     if (!newCategoryName.trim()) {
-      // Show validation error in the form instead of alert
       return;
     }
 
     try {
       if (editingCategory) {
-        // Update existing category
         await updateEventCategory(editingCategory.categoryId, {
           categoryId: editingCategory.categoryId,
           categoryName: newCategoryName,
@@ -96,7 +92,6 @@ export default function ManageCategories() {
           type: 'edit'
         });
       } else {
-        // Create new category
         await createEventCategory({
           categoryName: newCategoryName,
           description: newCategoryDescription
@@ -107,7 +102,6 @@ export default function ManageCategories() {
         });
       }
       
-      // Refresh the categories list
       fetchCategories();
       handleCloseModal();
     } catch (err: any) {

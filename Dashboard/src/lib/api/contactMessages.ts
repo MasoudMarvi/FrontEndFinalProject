@@ -1,7 +1,6 @@
 import api from '../axios';
 import { CreateContactMessageCommand } from './types';
 
-// Define the response type based on what your API returns
 export interface ContactMessageDto {
   id: string;
   name: string;

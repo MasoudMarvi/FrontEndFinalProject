@@ -5,7 +5,7 @@ import { Modal } from "../ui/modal";
 import Button from "../ui/button/Button";
 import Input from "../form/input/InputField";
 import Label from "../form/Label";
-import { updateUser } from "@/lib/api/users"; // Import the updateUser function
+import { updateUser } from "@/lib/api/users"; 
 
 export default function UserInfoCard() {
   const { isOpen, openModal, closeModal } = useModal();
@@ -16,7 +16,6 @@ export default function UserInfoCard() {
   const [updateSuccess, setUpdateSuccess] = useState(false);
   const [updateError, setUpdateError] = useState<string | null>(null);
   
-  // User data state
   const [userData, setUserData] = useState({
     userId: '',
     fullName: '',
@@ -24,17 +23,14 @@ export default function UserInfoCard() {
     role: ''
   });
   
-  // Form state
   const [formData, setFormData] = useState({
     fullName: '',
   });
 
-  // Set isClient to true when component mounts
   useEffect(() => {
     setIsClient(true);
   }, []);
   
-  // Get user data from localStorage when on client
   useEffect(() => {
     if (isClient) {
       try {
@@ -66,7 +62,6 @@ export default function UserInfoCard() {
     }
   }, [isClient]);
 
-  // Reset status messages when modal opens/closes
   useEffect(() => {
     if (!isOpen) {
       setUpdateSuccess(false);
@@ -84,14 +79,12 @@ export default function UserInfoCard() {
       setUpdateLoading(true);
       setUpdateError(null);
       
-      // Create FormData for the multipart/form-data request
       const formDataObj = new FormData();
       formDataObj.append('UserId', userData.userId);
       formDataObj.append('FullName', formData.fullName);
       formDataObj.append('Email', userData.email); // Keep the original email
       formDataObj.append('Role', userData.role); // Keep the original role
       
-      // Make the API request using the updateUser function
       await updateUser({
         userId: userData.userId,
         email: userData.email,
@@ -99,10 +92,8 @@ export default function UserInfoCard() {
         role: userData.role
       });
       
-      // Update localStorage with the new fullName
       localStorage.setItem('fullName', formData.fullName);
       
-      // Update the displayed user data
       setUserData(prev => ({
         ...prev,
         fullName: formData.fullName

@@ -24,13 +24,11 @@ export default function ResetPasswordCard() {
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
-    // Clear error and success messages when user starts typing
     setError(null);
     setSuccess(null);
   };
 
   const handleSave = async () => {
-    // Validate form
     if (!formData.currentPassword || !formData.newPassword || !formData.confirmPassword) {
       setError("All fields are required");
       return;
@@ -48,13 +46,11 @@ export default function ResetPasswordCard() {
     
     setIsLoading(true);
     try {
-      // Get userId from localStorage
       const userId = localStorage.getItem('userId');
       if (!userId) {
         throw new Error("User ID not found. Please log in again.");
       }
       
-      // Call the API to change password
       await usersApi.changePassword(
         userId,
         formData.currentPassword,
@@ -62,17 +58,14 @@ export default function ResetPasswordCard() {
         formData.confirmPassword
       );
       
-      // Show success message
       setSuccess("Password changed successfully");
       
-      // Reset form
       setFormData({
         currentPassword: '',
         newPassword: '',
         confirmPassword: '',
       });
       
-      // Close modal after a delay
       setTimeout(() => {
         closeModal();
         setSuccess(null);

@@ -15,13 +15,11 @@ const ManageUsersPage = () => {
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState<string>('');
   
-  // Modal states
   const [isCreateModalOpen, setIsCreateModalOpen] = useState<boolean>(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState<boolean>(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState<boolean>(false);
   const [selectedUser, setSelectedUser] = useState<UserResponse | null>(null);
   
-  // Fetch all users on component mount
   useEffect(() => {
     fetchUsers();
   }, []);
@@ -40,17 +38,14 @@ const ManageUsersPage = () => {
     }
   };
   
-  // Handle user creation
   const handleCreateUser = async (userData: CreateUserCommand) => {
     try {
-      // Create a FormData object for multipart/form-data request
       const formData = new FormData();
       formData.append('Email', userData.email || '');
       formData.append('Password', userData.password || '');
       formData.append('FullName', userData.fullName || '');
       formData.append('Role', userData.role || 'User');
       
-      // Handle profile picture if it exists
       if (userData.profilePicture instanceof File) {
         formData.append('ProfilePicture', userData.profilePicture);
       }
@@ -65,10 +60,8 @@ const ManageUsersPage = () => {
     }
   };
   
-// Handle user update
 const handleUpdateUser = async (userData: UpdateUserCommand) => {
   try {
-    // Call the updateUser function which handles FormData internally
     await usersApi.updateUser(userData);
     setIsEditModalOpen(false);
     fetchUsers(); // Refresh the users list
@@ -79,7 +72,6 @@ const handleUpdateUser = async (userData: UpdateUserCommand) => {
   }
 };
 
-  // Handle user deletion
   const handleDeleteUser = async (userId: string) => {
     try {
       await usersApi.deleteUser(userId);
@@ -92,19 +84,16 @@ const handleUpdateUser = async (userData: UpdateUserCommand) => {
     }
   };
   
-  // Open edit modal with selected user data
   const openEditModal = (user: UserResponse) => {
     setSelectedUser(user);
     setIsEditModalOpen(true);
   };
   
-  // Open delete confirmation modal
   const openDeleteModal = (user: UserResponse) => {
     setSelectedUser(user);
     setIsDeleteModalOpen(true);
   };
   
-  // Get user role for display
   const getUserRoleDisplay = (user: UserResponse) => {
     if (!user.roles || !Array.isArray(user.roles) || user.roles.length === 0) {
       return 'User';
@@ -112,12 +101,10 @@ const handleUpdateUser = async (userData: UpdateUserCommand) => {
     return user.roles.includes('Admin') ? 'Admin' : user.roles[0];
   };
 
-  // Check if user is admin
   const isAdmin = (user: UserResponse) => {
     return user.roles && Array.isArray(user.roles) && user.roles.includes('Admin');
   };
   
-  // Filter users based on search term
   const filteredUsers = users.filter(user => 
     user.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -125,7 +112,6 @@ const handleUpdateUser = async (userData: UpdateUserCommand) => {
       user.roles.some(role => role.toLowerCase().includes(searchTerm.toLowerCase())))
   );
   
-  // Simple notification system
   const [notification, setNotification] = useState<{ message: string; type: string } | null>(null);
   
   const showNotification = (message: string, type: 'success' | 'error') => {

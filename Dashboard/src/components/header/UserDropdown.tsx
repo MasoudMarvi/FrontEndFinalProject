@@ -16,7 +16,6 @@ export default function UserDropdown() {
   const router = useRouter();
 
   useEffect(() => {
-    // Get user data from localStorage
     const fullName = localStorage.getItem('fullName') || "";
     const email = localStorage.getItem('email') || "";
     const profilePictureUrl = localStorage.getItem('profilePictureUrl');
@@ -26,9 +25,7 @@ export default function UserDropdown() {
       email,
     });
     
-    // If profile picture URL exists in localStorage, use it
     if (profilePictureUrl) {
-      // Check if it's a relative URL and handle appropriately
       if (profilePictureUrl.startsWith('/')) {
         setProfileImage(`https://localhost:7235${profilePictureUrl}`);
       } else {
@@ -51,7 +48,6 @@ export default function UserDropdown() {
     router.push('/signin');
   }
 
-  // Get first name for display in the header
   const firstName = userData.fullName ? userData.fullName.split(' ')[0] : "";
 
   return (

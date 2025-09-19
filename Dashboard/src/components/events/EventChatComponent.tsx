@@ -55,12 +55,10 @@ useEffect(() => {
   };
 }, [eventId, currentUser]);
   
-  // First, set isClient to true when component mounts
   useEffect(() => {
     setIsClient(true);
   }, []);
   
-  // Get user data from localStorage only on the client
   useEffect(() => {
     if (isClient) {
       try {
@@ -69,7 +67,6 @@ useEffect(() => {
         const email = localStorage.getItem('email');
         const accessToken = localStorage.getItem('accessToken');
         
-        // Debug what we're getting from localStorage
         console.log("Auth data from localStorage:", { 
           userId, 
           fullName, 
@@ -78,7 +75,6 @@ useEffect(() => {
         });
         
         if (userId && accessToken) {
-          // We have a logged in user
           setCurrentUser({
             userId,
             fullName: fullName || email?.split('@')[0] || 'User',
@@ -94,12 +90,10 @@ useEffect(() => {
     }
   }, [isClient]);
   
-  // Scroll to bottom of messages
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
   
-  // Fetch event details and messages from the backend
   useEffect(() => {
     const fetchData = async () => {
       if (!eventId) return;
@@ -112,7 +106,6 @@ useEffect(() => {
         const eventData = await getEventById(eventId);
         setEvent(eventData);
         
-        // Fetch chat messages for this event
         const messagesData = await getChatMessagesByEvent(eventId);
         setMessages(messagesData);
       } catch (err: any) {
@@ -126,31 +119,17 @@ useEffect(() => {
     fetchData();
   }, [eventId]);
   
-  // Scroll to bottom when messages change
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
   
-  // Handle form submission to send a new message
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // if (!newMessage.trim() || !eventId) return;
       if (!newMessage.trim() || !eventId || !connection || !currentUser) return;
 
     
     try {
-      // Create message data
-      // const messageData: CreateChatMessageCommand = {
-      //   eventId: eventId,
-      //   messageText: newMessage.trim()
-      // };
-      
-      // // Send to backend
-      // const createdMessage = await createChatMessage(messageData);
-      
-      // // Add to messages
-      // setMessages(prevMessages => [...prevMessages, createdMessage]);
-      // setNewMessage('');
+    
        await connection.invoke(
       "SendMessage",
       eventId,
@@ -162,7 +141,6 @@ useEffect(() => {
     } catch (err: any) {
       console.error('Error sending message:', err);
       
-      // Check if error is due to auth issues
       if (err.response?.status === 401) {
         alert('Your session has expired. Please log in again.');
         window.location.href = '/auth/sign-in';
@@ -172,17 +150,14 @@ useEffect(() => {
     }
   };
   
-  // Format timestamp
   const formatTime = (timestamp: string) => {
     return new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
   
-  // Check if the message is from the current user
   const isCurrentUserMessage = (message: ChatMessageDto) => {
     return currentUser?.userId === message.userId;
   };
   
-  // Get first letter for avatar
   const getAvatarInitial = (name: string | undefined | null) => {
     if (!name) return 'U';
     return name.charAt(0).toUpperCase();

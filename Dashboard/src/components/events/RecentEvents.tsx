@@ -12,7 +12,6 @@ import Badge from "../ui/badge/Badge";
 import { getEvents } from "@/lib/api/events";
 import { EventDto, EventStatus } from "@/lib/api/types";
 
-// Define the TypeScript interface for our formatted event data
 interface FormattedEvent {
   id: string;
   title: string;
@@ -23,16 +22,12 @@ interface FormattedEvent {
   image: string;
 }
 
-// Placeholder image for events without images
 const DEFAULT_IMAGE = "/images/event/event-default.jpg";
 
-// Base URL for event images - use the full URL to your API
 const IMAGE_BASE_URL = 'https://localhost:7235/uploads/events/';
 
-// Helper function to get the first available image from an event
 function getEventImage(event: EventDto): string {
   try {
-    // Check for valid image paths in order of priority
     if (event.picture1 && event.picture1.trim() !== '') {
       return `${IMAGE_BASE_URL}${event.picture1.split('/').pop()}`;
     } 
@@ -49,7 +44,6 @@ function getEventImage(event: EventDto): string {
   return DEFAULT_IMAGE;
 }
 
-// Helper function to map EventStatus to display status
 function getStatusDisplay(status: EventStatus): "Pending" | "Active" | "Cancelled" {
   switch (status) {
     case EventStatus.Pending:
@@ -63,7 +57,6 @@ function getStatusDisplay(status: EventStatus): "Pending" | "Active" | "Cancelle
   }
 }
 
-// Helper function to map status to badge color
 function getStatusColor(status: EventStatus): "success" | "warning" | "info" | "error" {
   switch (status) {
     case EventStatus.Pending:
@@ -87,12 +80,10 @@ export default function RecentEvents() {
     const fetchRecentEvents = async () => {
       try {
         setLoading(true);
-        // Get events from backend
         const eventsData = await getEvents();
         
         const now = new Date();
         
-        // Format the events data
         const formattedEvents: FormattedEvent[] = eventsData
           .map((event: EventDto) => {
             return {
@@ -106,15 +97,11 @@ export default function RecentEvents() {
               }),
               status: getStatusDisplay(event.status),
               statusCode: event.status,
-              // Use the helper function to get image URL
               image: getEventImage(event)
             };
           })
-          // Filter only upcoming events (events that haven't ended yet)
           .filter((event) => new Date(event.date) >= now)
-          // Sort by date (closest upcoming first)
           .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-          // Limit to 5 events
           .slice(0, 5);
         
         setEvents(formattedEvents);

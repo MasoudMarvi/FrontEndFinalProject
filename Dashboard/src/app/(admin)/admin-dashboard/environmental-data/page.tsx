@@ -4,7 +4,6 @@ import { GoogleMap, LoadScript, Marker, InfoWindow } from '@react-google-maps/ap
 import PageBreadCrumb from '@/components/common/PageBreadCrumb';
 import Link from 'next/link';
 
-// Define the type for environmental data
 interface EnvironmentalDataPoint {
   id: number;
   location: { lat: number; lng: number };
@@ -16,7 +15,6 @@ interface EnvironmentalDataPoint {
 }
 
 export default function EnvironmentalData() {
-  // Sample environmental data
   const [environmentalData, setEnvironmentalData] = useState<EnvironmentalDataPoint[]>([
     {
       id: 1,
@@ -59,7 +57,6 @@ export default function EnvironmentalData() {
   
   const [mapClickLocation, setMapClickLocation] = useState<{ lat: number; lng: number } | null>(null);
 
-  // Map configuration
   const containerStyle = {
     width: '100%',
     height: '400px'
@@ -70,7 +67,6 @@ export default function EnvironmentalData() {
     lng: 51.3347
   };
 
-  // Helper function to get pin color based on air quality status
   function getStatusPinColor(status: string): string {
     const colorMap: Record<string, string> = {
       Good: "green",
@@ -142,10 +138,8 @@ export default function EnvironmentalData() {
       lastUpdated: new Date().toISOString()
     };
     
-    // Add to data
     setEnvironmentalData(prev => [...prev, newPoint]);
     
-    // Close modal and reset form
     setIsAddModalOpen(false);
     setNewDataPoint({
       name: '',
@@ -161,7 +155,6 @@ export default function EnvironmentalData() {
     setEnvironmentalData(prev => prev.filter(item => item.id !== id));
   };
 
-  // Handle map click
   const handleMapClick = (e: google.maps.MapMouseEvent) => {
     if (e.latLng) {
       const lat = e.latLng.lat();

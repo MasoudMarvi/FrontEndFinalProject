@@ -7,7 +7,6 @@ import { getEvents, getEventsByCategory } from '@/lib/api/events';
 import { getEventCategories } from '@/lib/api/eventCategories';
 import { EventDto, EventCategoryDto, EventStatus } from '@/lib/api/types';
 
-// Define the type for event data
 interface MapEventData {
   id: string;
   title: string;
@@ -29,13 +28,11 @@ const containerStyle = {
   height: '500px'
 };
 
-// Default center on Tehran
 const defaultCenter = {
   lat: 35.7219,
   lng: 51.3347
 };
 
-// Helper functions (unchanged)
 function getCategoryPinColor(category: string): string {
   const colorMap: Record<string, string> = {
     'Music': "red",
@@ -103,12 +100,10 @@ const EventsMap = () => {
   const [mapZoom, setMapZoom] = useState(12);
   const [searchQuery, setSearchQuery] = useState("");
   
-  // References for Google Maps components
   const mapRef = useRef<google.maps.Map | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
 
-  // Fetch categories on component mount
   useEffect(() => {
     const fetchCategories = async () => {
       try {
@@ -123,7 +118,6 @@ const EventsMap = () => {
     fetchCategories();
   }, []);
 
-  // Fetch events whenever the selected category changes
   useEffect(() => {
     const fetchEvents = async () => {
       setLoading(true);
@@ -136,7 +130,6 @@ const EventsMap = () => {
           eventsData = await getEventsByCategory(selectedCategoryId);
         }
         
-        // Transform backend event data to the format our map component expects
         const mappedEvents: MapEventData[] = eventsData.map(event => ({
           id: event.eventId,
           title: event.title || 'Untitled Event',
@@ -167,19 +160,15 @@ const EventsMap = () => {
     fetchEvents();
   }, [selectedCategoryId]);
 
-  // Filter events to only show Active status events
   useEffect(() => {
-    // Filter to only show active events
     const activeEvents = events.filter(event => event.status === EventStatus.Active);
     setFilteredEvents(activeEvents);
     
-    // If the selected event is not active, deselect it
     if (selectedEvent && selectedEvent.status !== EventStatus.Active) {
       setSelectedEvent(null);
     }
   }, [events]);
 
-  // Initialize autocomplete when Maps API is loaded
   useEffect(() => {
     if (isLoaded && searchInputRef.current && window.google && window.google.maps && window.google.maps.places) {
       try {
@@ -190,12 +179,10 @@ const EventsMap = () => {
         
         autocompleteRef.current = autocomplete;
         
-        // If map is already loaded, bind to it
         if (mapRef.current) {
           autocomplete.bindTo("bounds", mapRef.current);
         }
         
-        // Add listener for place selection
         const listener = autocomplete.addListener("place_changed", () => {
           const place = autocomplete.getPlace();
           
@@ -204,23 +191,19 @@ const EventsMap = () => {
             return;
           }
           
-          // Get location coordinates
           const lat = place.geometry.location.lat();
           const lng = place.geometry.location.lng();
           
-          // Update map center and zoom
           const newCenter = { lat, lng };
           setMapCenter(newCenter);
           setMapZoom(15);
           
-          // Update the map
           if (mapRef.current) {
             mapRef.current.panTo(newCenter);
             mapRef.current.setZoom(15);
           }
         });
         
-        // Clean up listener on unmount
         return () => {
           if (google && google.maps && google.maps.event && listener) {
             google.maps.event.removeListener(listener);
@@ -233,27 +216,22 @@ const EventsMap = () => {
     }
   }, [isLoaded, searchInputRef.current]);
 
-  // Handle category change
   const handleCategoryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     setSelectedCategoryId(e.target.value);
   };
   
-  // Map load handler
   const onMapLoad = (map: google.maps.Map) => {
     mapRef.current = map;
     
-    // Bind autocomplete to map bounds if it exists
     if (autocompleteRef.current && map) {
       autocompleteRef.current.bindTo("bounds", map);
     }
   };
 
-  // Handle search input change
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(e.target.value);
   };
 
-  // If Maps API is not loaded yet
   if (!isLoaded) {
     return (
       <div className="rounded-2xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-white/[0.03] mb-6">

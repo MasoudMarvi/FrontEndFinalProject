@@ -5,10 +5,9 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json'
   },
-  withCredentials: true // اگه نیاز به کوکی داشتی
+  withCredentials: true
 });
 
-// 👉 اینجا می‌تونی interceptor اضافه کنی برای JWT
 api.interceptors.request.use(config => {
   const token = localStorage.getItem('accessToken');
   if (token) {

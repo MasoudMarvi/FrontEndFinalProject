@@ -10,7 +10,6 @@ interface EditUserModalProps {
 }
 
 const EditUserModal: React.FC<EditUserModalProps> = ({ isOpen, onClose, onSubmit, user }) => {
-  // Extract the role from user's roles array
   const getUserRole = (user: UserResponse): string => {
     if (!user.roles || !Array.isArray(user.roles) || user.roles.length === 0) {
       return 'User';
@@ -19,22 +18,21 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ isOpen, onClose, onSubmit
   };
   
   const [formData, setFormData] = useState<UpdateUserCommand>({
-    userId: user.id, // Correct property name
+    userId: user.id, 
     email: user.email,
     fullName: user.fullName,
-    role: getUserRole(user) // Extract role correctly
+    role: getUserRole(user) 
   });
   
   const [profilePicture, setProfilePicture] = useState<File | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   
-  // Update form data when user prop changes
   useEffect(() => {
     setFormData({
-      userId: user.id, // Correct property name
+      userId: user.id, 
       email: user.email,
       fullName: user.fullName,
-      role: getUserRole(user) // Extract role correctly
+      role: getUserRole(user) 
     });
   }, [user]);
   
@@ -44,7 +42,6 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ isOpen, onClose, onSubmit
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
     
-    // Clear error when field is edited
     if (errors[name]) {
       setErrors(prev => {
         const newErrors = { ...prev };

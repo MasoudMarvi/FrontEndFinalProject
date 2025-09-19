@@ -7,7 +7,6 @@ export interface AboutDto {
   updatedAt: string | null;
 }
 
-// Define the EventStatus enum to match backend
 export enum EventStatus {
   Pending = 0,
   Active = 1,
@@ -41,7 +40,6 @@ export interface CreateContactMessageCommand {
   message: string | null;
 }
 
-// New EnvironmentalData types
 export interface EnvironmentalDataDto {
   dataId: string;
   type: number;
@@ -100,7 +98,6 @@ export interface ForumSummaryDto {
   messageCount: number;
 }
 
-// Updated EventDto with new fields
 export interface EventDto {
   eventId: string;
   title: string | null;
@@ -125,7 +122,6 @@ export interface EventDetailDto extends EventDto {
   chatMessageCount: number;
 }
 
-// Form data for multipart/form-data requests
 export interface EventFormData {
   eventId?: string; // Added eventId for updates
   title: string;

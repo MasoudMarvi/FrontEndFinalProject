@@ -20,15 +20,12 @@ export default function CreateEventForm() {
   const { isOpen: isNotificationOpen, openModal: openNotification, closeModal: closeNotification } = useModal();
   const { isLoaded } = useGoogleMaps();
   
-  // State for user role
   const [userRole, setUserRole] = useState<string>("");
   const [isAdmin, setIsAdmin] = useState(false);
   
-  // State for images (supporting 3 images)
   const [imageFiles, setImageFiles] = useState<(File | null)[]>([null, null, null]);
   const [imagePreviews, setImagePreviews] = useState<(string | null)[]>([null, null, null]);
   
-  // Form data state
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [categoryId, setCategoryId] = useState("");
@@ -42,48 +39,39 @@ export default function CreateEventForm() {
   const [status, setStatus] = useState<EventStatus>(EventStatus.Pending);
   const [loading, setLoading] = useState(false);
   
-  // Form feedback
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [notificationMessage, setNotificationMessage] = useState("");
   
-  // Categories from API
   const [categories, setCategories] = useState<EventCategoryDto[]>([]);
   const [loadingCategories, setLoadingCategories] = useState(false);
   
-  // Map center (default location)
   const mapCenter = { lat: 35.7219, lng: 51.3347 }; // Tehran center
   const [mapZoom, setMapZoom] = useState(13);
   
-  // Map options
   const mapOptions = {
     disableDefaultUI: false,
     clickableIcons: true,
     scrollwheel: true,
   };
 
-  // Search functionality
   const [searchQuery, setSearchQuery] = useState("");
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
   const mapRef = useRef<google.maps.Map | null>(null);
   
-  // Check user role on component mount
   useEffect(() => {
-    // Get user roles from localStorage
     const userRoles = localStorage.getItem('roles');
     if (userRoles) {
       try {
         const roles = JSON.parse(userRoles);
         setUserRole(Array.isArray(roles) ? roles[0] : roles);
-        // Check if user is admin (case-insensitive)
         const adminRole = Array.isArray(roles) ? 
           roles.some(role => typeof role === 'string' && role.toLowerCase() === 'admin') :
           (typeof roles === 'string' && roles.toLowerCase() === 'admin');
         
         setIsAdmin(adminRole);
         
-        // If user is not admin, set status to Pending by default
         if (!adminRole) {
           setStatus(EventStatus.Pending);
         }
@@ -93,7 +81,6 @@ export default function CreateEventForm() {
     }
   }, []);
   
-  // Fetch categories on component mount
   useEffect(() => {
     const fetchCategories = async () => {
       setLoadingCategories(true);
@@ -114,7 +101,6 @@ export default function CreateEventForm() {
     fetchCategories();
   }, []);
   
-  // Initialize autocomplete when Maps API is loaded
   useEffect(() => {
     if (isLoaded && searchInputRef.current && window.google && window.google.maps && window.google.maps.places) {
       try {
@@ -125,12 +111,10 @@ export default function CreateEventForm() {
         
         autocompleteRef.current = autocomplete;
         
-        // If map is already loaded, bind to it
         if (mapRef.current) {
           autocomplete.bindTo("bounds", mapRef.current);
         }
         
-        // Add listener for place selection
         const listener = autocomplete.addListener("place_changed", () => {
           const place = autocomplete.getPlace();
           
@@ -139,27 +123,22 @@ export default function CreateEventForm() {
             return;
           }
           
-          // Get location coordinates
           const lat = place.geometry.location.lat();
           const lng = place.geometry.location.lng();
           
-          // Update location and map
           setLocation({ lat, lng });
           setMapZoom(15);
           
-          // Update the map
           if (mapRef.current) {
             mapRef.current.panTo({ lat, lng });
             mapRef.current.setZoom(15);
           }
           
-          // Set location name if available
           if (place.name) {
             setLocationName(place.name);
           }
         });
         
-        // Clean up listener on unmount
         return () => {
           if (google && google.maps && google.maps.event && listener) {
             google.maps.event.removeListener(listener);
@@ -172,7 +151,6 @@ export default function CreateEventForm() {
     }
   }, [isLoaded, searchInputRef.current]);
   
-  // Clear messages after 5 seconds
   useEffect(() => {
     if (errorMessage || successMessage) {
       const timer = setTimeout(() => {
@@ -184,7 +162,6 @@ export default function CreateEventForm() {
     }
   }, [errorMessage, successMessage]);
   
-  // Handle map click to set marker and update coordinates
   const handleMapClick = useCallback((e: google.maps.MapMouseEvent) => {
     if (e.latLng) {
       const lat = e.latLng.lat();
@@ -193,16 +170,13 @@ export default function CreateEventForm() {
     }
   }, []);
 
-  // Handle image upload for multiple images
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>, index: number) => {
     const file = e.target.files?.[0];
     if (file) {
-      // Create a new array with the updated file
       const newImageFiles = [...imageFiles];
       newImageFiles[index] = file;
       setImageFiles(newImageFiles);
       
-      // Create a preview for the image
       const reader = new FileReader();
       reader.onloadend = () => {
         const newImagePreviews = [...imagePreviews];
@@ -213,7 +187,6 @@ export default function CreateEventForm() {
     }
   };
 
-  // Handle image removal
   const handleRemoveImage = (index: number) => {
     const newImageFiles = [...imageFiles];
     const newImagePreviews = [...imagePreviews];
@@ -225,7 +198,6 @@ export default function CreateEventForm() {
     setImagePreviews(newImagePreviews);
   };
   
-  // Reset the form after successful submission
   const resetForm = () => {
     setTitle("");
     setDescription("");
@@ -243,17 +215,14 @@ export default function CreateEventForm() {
     setSearchQuery("");
   };
   
-  // Form submission handler
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Validate required fields
     if (!title || !description || !categoryId || !startDate || !startTime || !location) {
       setErrorMessage("Please fill in all required fields");
       return;
     }
     
-    // Format the dates correctly for the API
     const startDateTime = new Date(`${startDate}T${startTime}`).toISOString();
     const endDateTime = endDate && endTime 
       ? new Date(`${endDate}T${endTime}`).toISOString()
@@ -262,13 +231,10 @@ export default function CreateEventForm() {
     setLoading(true);
     
     try {
-      // For non-admin users, always set status to Pending
       const eventStatus = isAdmin ? status : EventStatus.Pending;
       
-      // Prepare the event data according to the updated API schema
       const formData = new FormData();
       
-      // Add all non-file fields
       formData.append('Title', title);
       formData.append('Description', description);
       formData.append('Latitude', location.lat.toString());
@@ -292,7 +258,6 @@ export default function CreateEventForm() {
         formData.append('Picture3', imageFiles[2]);
       }
       
-      // Call the API to create the event with the updated implementation
       const result = await createEvent({
         title,
         description,
@@ -308,11 +273,9 @@ export default function CreateEventForm() {
         picture3: imageFiles[2] || undefined
       });
       
-      // Show success notification modal
       setNotificationMessage(`Event "${title}" created successfully!`);
       openNotification();
       
-      // Reset form for a new event
       resetForm();
     } catch (error: any) {
       console.error("Error creating event:", error);
@@ -322,21 +285,17 @@ export default function CreateEventForm() {
     }
   };
 
-  // Handle notification close and form reset
   const handleNotificationClose = () => {
     closeNotification();
   };
 
-  // Handle search input change
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(e.target.value);
   };
 
-  // Map load handler
   const onMapLoad = (map: google.maps.Map) => {
     mapRef.current = map;
     
-    // Bind autocomplete to map bounds if it exists
     if (autocompleteRef.current && map) {
       autocompleteRef.current.bindTo("bounds", map);
     }

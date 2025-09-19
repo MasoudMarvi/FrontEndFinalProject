@@ -13,12 +13,9 @@ export default function UserMetaCard() {
   const [isClient, setIsClient] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   
-  // Default profile image path
   const DEFAULT_PROFILE_IMAGE = "/images/user/NoImage.jpeg";
-  // API base URL
   const API_BASE_URL = "https://localhost:7235";
   
-  // State for profile image and user data
   const [profileImage, setProfileImage] = useState(DEFAULT_PROFILE_IMAGE);
   const [userData, setUserData] = useState({
     userId: '',
@@ -26,12 +23,10 @@ export default function UserMetaCard() {
     email: '',
   });
 
-  // Set isClient to true when component mounts
   useEffect(() => {
     setIsClient(true);
   }, []);
   
-  // Get user data from localStorage when on client
   useEffect(() => {
     if (isClient) {
       try {
@@ -46,10 +41,8 @@ export default function UserMetaCard() {
           email
         });
         
-        // If profile picture URL exists in localStorage, use it
         if (profilePictureUrl) {
           console.log("Found profile picture URL in localStorage:", profilePictureUrl);
-          // Check if it's a relative URL and handle appropriately
           if (profilePictureUrl.startsWith('/')) {
             setProfileImage(`${API_BASE_URL}${profilePictureUrl}`);
           } else {
@@ -93,33 +86,27 @@ export default function UserMetaCard() {
       try {
         setIsLoading(true);
         
-        // Check file size (limit to 5MB)
         if (file.size > 5 * 1024 * 1024) {
           showError("Image is too large. Please select an image under 5MB.");
           setIsLoading(false);
           return;
         }
 
-        // Check file type
         if (!file.type.startsWith('image/')) {
           showError("Selected file is not an image. Please select a valid image file.");
           setIsLoading(false);
           return;
         }
 
-        // Create a URL for the file to display as preview
         const imageUrl = URL.createObjectURL(file);
         
-        // Create a FormData object to send to the server
         const formData = new FormData();
         formData.append('ProfilePicture', file);
         formData.append('UserId', userData.userId);
         
-        // Get current user data to keep it intact
         const email = localStorage.getItem('email') || '';
         const fullName = localStorage.getItem('fullName') || '';
         
-        // Handle roles carefully to avoid JSON parsing errors
         let roles;
         try {
           const rolesString = localStorage.getItem('roles');
@@ -143,7 +130,6 @@ export default function UserMetaCard() {
           fileType: file.type
         });
         
-        // Send the image to the server
         const response = await fetch(`${API_BASE_URL}/api/Users/UpdateUser`, {
           method: 'PUT',
           headers: {
@@ -153,16 +139,13 @@ export default function UserMetaCard() {
         });
         
         if (response.ok) {
-          // Get the response data
           const data = await response.json();
           console.log("Update response:", data);
           
-          // If the response includes a profile picture URL, update localStorage
           if (data && data.profilePictureUrl) {
             console.log("Received profilePictureUrl from server:", data.profilePictureUrl);
             localStorage.setItem('profilePictureUrl', data.profilePictureUrl);
             
-            // If it's a relative URL, prepend the base URL for display
             if (data.profilePictureUrl.startsWith('/')) {
               setProfileImage(`${API_BASE_URL}${data.profilePictureUrl}`);
             } else {
@@ -172,11 +155,8 @@ export default function UserMetaCard() {
             showSuccess("Profile picture updated successfully!");
           } else {
             
-            // Use the local image URL as fallback
             setProfileImage(imageUrl);
             
-            // Store the file URL temporarily
-            // Note: This is not ideal as the URL will be invalidated when the page refreshes
             localStorage.setItem('profilePictureUrl', imageUrl);
             
             showSuccess("Profile picture updated successfully!");
@@ -184,7 +164,6 @@ export default function UserMetaCard() {
           
           setIsImageModalOpen(false);
         } else {
-          // Try to get error details
           let errorDetail;
           try {
             const errorData = await response.json();

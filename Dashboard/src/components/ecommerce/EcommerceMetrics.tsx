@@ -3,7 +3,6 @@ import React, { useEffect, useState } from "react";
 import { GroupIcon } from "@/icons";
 import { getStats } from "@/lib/api/stats";
 
-// Define the Stats interface based on the API response
 interface Stats {
   totalEvents: number;
   totalEventsPending: number;
@@ -30,7 +29,6 @@ export const EcommerceMetrics = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Color array for category indicators
   const categoryColors = ["bg-red-500", "bg-blue-500", "bg-green-500"];
 
   useEffect(() => {
@@ -57,13 +55,11 @@ export const EcommerceMetrics = () => {
     return <div className="w-full p-6 text-center text-red-500">{error}</div>;
   }
 
-  // Get top 3 categories
   const getTopCategories = () => {
     if (!stats || !stats.topCategories || stats.topCategories.length === 0) {
       return [];
     }
     
-    // Get up to 3 top categories
     return stats.topCategories.slice(0, 3).map((category, index) => ({
       name: category.categoryName || "Unknown",
       color: categoryColors[index] || "bg-gray-500"

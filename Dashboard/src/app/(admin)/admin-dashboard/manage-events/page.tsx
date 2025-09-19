@@ -19,17 +19,15 @@ import {
   deleteEnvironmentalData
 } from '@/lib/api/environmentalData';
 
-// Define the environmental data type
 interface EnvironmentalData {
-  dataId?: string;  // Optional for new records
+  dataId?: string;  
   eventId: string;
-  type: number;  // Air Quality, Noise Level, Water Quality, etc.
+  type: number;  
   value: number;
-  unit: string;  // ppm, dB, etc.
+  unit: string;  
   description?: string;
 }
 
-// Extended event data for UI (with additional fields for images and environmental data)
 interface ExtendedEventData extends EventDto {
   environmentalData?: EnvironmentalData[];
   images?: string[];
@@ -42,20 +40,16 @@ interface ExtendedEventData extends EventDto {
   time: string;
   hasEnvironmentalData: boolean;
   organizer: string;
-  // For image uploads
   picture1File?: File | null;
   picture2File?: File | null;
   picture3File?: File | null;
 }
 
-// Default image for events with no images
 const DEFAULT_IMAGE = "/images/event/event-default.jpg";
 
-// Base URL for event images
 const IMAGE_BASE_URL = 'https://localhost:7235/uploads/events/';
 
 
-// Map component
 const MapComponent = ({
   location,
   onLocationChange
@@ -104,12 +98,9 @@ const MapComponent = ({
   ) : <div className="h-[300px] bg-gray-100 dark:bg-gray-800 flex items-center justify-center">Loading Map...</div>;
 };
 
-// Helper function to get image URL from backend path
 function getImageUrl(imagePath: string | null | undefined): string {
   if (!imagePath) return DEFAULT_IMAGE;
-  // If it's already a data URL (from file input preview), return it as is
   if (imagePath.startsWith('data:')) return imagePath;
-  // Clean up the path to avoid duplication
   const cleanPath = imagePath.replace(/^\/uploads\/events\//, '');
   return cleanPath ? `${IMAGE_BASE_URL}${cleanPath}` : DEFAULT_IMAGE;
 }
@@ -132,25 +123,21 @@ export default function ManageEvents() {
   const [isRefreshingData, setIsRefreshingData] = useState(false);
   const [envDataLoading, setEnvDataLoading] = useState(false);
 
-  // Fetch events and categories on component mount
   useEffect(() => {
     const fetchData = async () => {
       setIsLoading(true);
       setError(null);
 
       try {
-        // Fetch categories first
         const categoriesData = await getEventCategories();
         setCategories(categoriesData);
 
-        // Then fetch all events (including private ones for admin)
         const eventsData = await getEvents(true);
 
-        // Transform events to include UI-specific fields
         const transformedEvents: ExtendedEventData[] = eventsData.map(event => ({
           ...event,
           location: {
-            name: 'Event Location', // Default location name
+            name: 'Event Location', 
             lat: event.latitude,
             lng: event.longitude,
           },
@@ -178,11 +165,9 @@ export default function ManageEvents() {
     fetchData();
   }, [isRefreshingData]);
 
-  // Filter events based on category and status
   const filteredEvents = events.filter(event => {
     const matchesCategory = selectedCategory === 'All Categories' || event.categoryName === selectedCategory;
 
-    // For status filtering
     let statusMatch = true;
     if (selectedStatus !== 'All Status') {
       if (selectedStatus === 'Active') {
@@ -214,7 +199,6 @@ export default function ManageEvents() {
     try {
       setEditingEvent({ ...event });
 
-      // Set date and time fields
       const startDateTime = new Date(event.startDateTime);
       const endDateTime = new Date(event.endDateTime);
 
@@ -223,7 +207,6 @@ export default function ManageEvents() {
       setEndDate(endDateTime.toISOString().split('T')[0]);
       setEndTime(endDateTime.toTimeString().substring(0, 5));
 
-      // Fetch environmental data for this event
       setEnvDataLoading(true);
       try {
         const envData = await getEnvironmentalDataByEventId(event.eventId);
@@ -250,7 +233,6 @@ export default function ManageEvents() {
     }
   };
 
-  // Handle form field changes
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
 
@@ -274,7 +256,6 @@ export default function ManageEvents() {
     }
   };
 
-  // Handle location change from map
   const handleLocationChange = (lat: number, lng: number) => {
     if (!editingEvent) return;
 
@@ -295,7 +276,6 @@ export default function ManageEvents() {
     if (!editingEvent) return;
 
     try {
-      // Create start and end date-times by combining date and time
       const startDateTime = new Date(`${startDate}T${startTime}`);
       const endDateTime = new Date(`${endDate}T${endTime}`);
       console.log('Submitting event update with data:', {
@@ -319,13 +299,10 @@ export default function ManageEvents() {
         picture3: editingEvent.picture3File ?? undefined,
       });
 
-      // Close modal and refresh data
       setIsEditModalOpen(false);
 
-      // Reset state
       setEditingEvent(null);
 
-      // Refresh the events list
       setIsRefreshingData(prev => !prev);
 
     } catch (err) {
@@ -334,13 +311,12 @@ export default function ManageEvents() {
     }
   };
 
-  // Add new environmental data
   const handleAddEnvironmentalData = () => {
     if (!editingEvent) return;
 
     const newEnvData: EnvironmentalData = {
       eventId: editingEvent.eventId,
-      type: 0, // Default to first type (e.g., Air Quality)
+      type: 0, 
       value: 0,
       unit: '',
       description: ''
@@ -350,7 +326,6 @@ export default function ManageEvents() {
     setIsEnvDataModalOpen(true);
   };
 
-  // Handle env data form changes
   const handleEnvDataChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     if (!editingEnvData) return;
 
@@ -362,32 +337,26 @@ export default function ManageEvents() {
     });
   };
 
-  // Save environmental data
   const handleEnvDataSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!editingEvent || !editingEnvData) return;
 
     try {
-      // This is a new API call specifically for environmental data
       if (editingEnvData.dataId) {
-        // Update existing environmental data
         await updateEnvironmentalData({
           ...editingEnvData,
           description: editingEnvData.description ?? null
         });
       } else {
-        // Create new environmental data
         await createEnvironmentalData({
           data: {...editingEnvData, description: editingEnvData.description ?? null
           }
         });
       }
 
-      // Fetch updated environmental data
       const updatedEnvData = await getEnvironmentalDataByEventId(editingEvent.eventId);
 
-      // Update the editing event with new environmental data
       setEditingEvent({
         ...editingEvent,
         environmentalData: updatedEnvData,
@@ -403,22 +372,18 @@ export default function ManageEvents() {
     }
   };
 
-  // Edit existing environmental data
   const handleEditEnvData = (data: EnvironmentalData) => {
     setEditingEnvData({ ...data });
     setIsEnvDataModalOpen(true);
   };
 
-  // Delete environmental data
   const handleDeleteEnvData = async (id: string) => {
     if (!editingEvent || !editingEvent.environmentalData) return;
 
     if (window.confirm('Are you sure you want to delete this environmental data point?')) {
       try {
-        // Call the delete API
         await deleteEnvironmentalData(id);
 
-        // Update the local state
         const updatedEnvData = editingEvent.environmentalData.filter(item => item.dataId !== id);
 
         setEditingEvent({
@@ -433,7 +398,6 @@ export default function ManageEvents() {
     }
   };
 
-  // Status options based on the EventStatus enum
   const getStatusDisplayName = (status: EventStatus) => {
     switch (status) {
       case EventStatus.Active:
@@ -460,10 +424,8 @@ export default function ManageEvents() {
     }
   };
 
-  // Create category options array with "All Categories" at the beginning
   const categoryOptions = ['All Categories', ...(categories.map(cat => cat.categoryName || '').filter(Boolean))];
 
-  // Status options
   const statuses = ['All Status', 'Active', 'Pending', 'Cancelled'];
   const envDataTypes = [
     { value: 0, label: "Air Quality" },
@@ -475,7 +437,6 @@ export default function ManageEvents() {
     { value: 6, label: "Other" },
   ];
 
-  // Loading state
   if (isLoading) {
     return (
       <>
@@ -492,7 +453,6 @@ export default function ManageEvents() {
     );
   }
 
-  // Error state
   if (error) {
     return (
       <>
@@ -531,7 +491,7 @@ export default function ManageEvents() {
           </div>
           <div>
             <Link
-              href="/form-elements" // Link to your existing CreateEventForm
+              href="/form-elements" 
               className="px-4 py-2 bg-brand-500 text-white rounded-lg hover:bg-brand-600 flex items-center gap-2"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
