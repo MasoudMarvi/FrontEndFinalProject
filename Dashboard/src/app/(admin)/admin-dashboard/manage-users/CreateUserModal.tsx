@@ -23,7 +23,6 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({ isOpen, onClose, onSu
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
     
-    // Clear error when field is edited
     if (errors[name]) {
       setErrors(prev => {
         const newErrors = { ...prev };
